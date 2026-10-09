@@ -1,0 +1,9 @@
+{
+  "name": "korean-study",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/engine.test.mjs",
+    "start": "npx --yes serve site -l 5173"
+  }
+}
