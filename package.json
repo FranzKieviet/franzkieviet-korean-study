@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node tests/engine.test.mjs",
-    "start": "npx --yes serve site -l 5173"
+    "build": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true});fs.cpSync('site','dist/korean',{recursive:true})\"",
+    "start": "npm run build && npx --yes serve dist -l 5173"
   }
 }

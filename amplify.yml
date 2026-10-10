@@ -4,8 +4,10 @@ frontend:
     build:
       commands:
         - npm test
+        # served under /korean/ so it works behind franzkieviet.com/korean
+        - npm run build
   artifacts:
-    baseDirectory: site
+    baseDirectory: dist
     files:
       - '**/*'
   cache:
