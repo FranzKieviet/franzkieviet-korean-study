@@ -168,6 +168,40 @@ export function acceptQuestions(slots, questions = []) {
   });
 }
 
+const EXPLAIN_SYSTEM = `You are a friendly Korean tutor for an English-speaking beginner studying "Anytime Korean" (Beginning 1 & 2).
+The learner typed an answer that was graded wrong. Explain in plain, short English (Korean words in Hangul where needed, no romanization):
+- "wrong": why the learner's answer does not work here (1-3 sentences). Name the specific mistake (particle choice and batchim, tense, conjugation, spelling, word choice…).
+- "right": why the expected answer is correct (1-3 sentences), stating the rule.
+- "alsoCorrect": true only if the learner's answer is genuinely also correct and natural for this sentence and cue; then "wrong" should say so instead.
+Stay at beginner level. Do not repeat the whole question back.`;
+
+const EXPLAIN_SCHEMA = {
+  type: 'OBJECT',
+  required: ['wrong', 'right', 'alsoCorrect'],
+  propertyOrdering: ['wrong', 'right', 'alsoCorrect'],
+  properties: { wrong: { type: 'STRING' }, right: { type: 'STRING' }, alsoCorrect: { type: 'BOOLEAN' } },
+};
+
+/** Gemini explains a wrong answer: { wrong, right, alsoCorrect }. Throws on API/network errors. */
+export async function explainMistake(q, given) {
+  const t = q.topicId ? topicById(q.topicId) : null;
+  const prompt = [
+    t ? `Grammar topic: ${t.title} — ${t.meaning}` : '',
+    q.q ? `Sentence (blank = ___): ${q.q}` : '',
+    q.cue ? `Cue: ${q.cue}` : '',
+    q.en ? `English: ${q.en}` : '',
+    `Accepted answers: ${q.a.join(' | ')}`,
+    q.note ? `Teacher's note: ${q.note}` : '',
+    `Learner's answer: ${given}`,
+  ].filter(Boolean).join('\n');
+  const text = await generate(EXPLAIN_SYSTEM, prompt, {
+    responseMimeType: 'application/json',
+    responseSchema: EXPLAIN_SCHEMA,
+    maxOutputTokens: 4000,
+  });
+  try { return JSON.parse(text); } catch { throw new Error('response was not valid JSON'); }
+}
+
 /** Cheap call to check the key works. */
 export async function testApiKey() {
   await generate('', 'Say OK.', { maxOutputTokens: 256 });

@@ -3,6 +3,9 @@ import { h, esc } from './dom.js';
 import { norm } from './hangul.js';
 import { speak, speakButton } from './tts.js';
 import { state } from './state.js';
+import { LESSONS } from './data/grammar.js';
+import { explainLocal } from './explain.js';
+import { getApiKey, explainMistake } from './ai.js';
 
 const stripHints = (s) => s.replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
 
@@ -23,6 +26,36 @@ export function isCorrect(input, q) {
   // also accept the whole sentence typed out
   if (q.q && q.q.includes('___')) return q.a.some((a) => norm(fullSentence(q, a)) === n);
   return false;
+}
+
+/** English-only label for the chip above a question (the Korean topic title can give the answer away). */
+function chipLabel(q) {
+  if (!q.topicId) return q.topicTitle;
+  const n = +q.topicId.split('.')[0];
+  const lesson = LESSONS.find((l) => l.n === n);
+  return lesson ? `Lesson ${n} · ${lesson.theme}` : `Lesson ${n}`;
+}
+
+/** "Why yours is wrong / why the answer is right" block. Offline first; Gemini replaces it when a key is set. */
+function explainBlock(q, given) {
+  const el = h('div', { class: 'explain' });
+  const fill = ({ wrong, right }, by) => el.replaceChildren(
+    h('div', { class: 'why' }, h('strong', {}, 'Why yours is wrong: '), wrong.join(' ')),
+    right.length ? h('div', { class: 'why' }, h('strong', {}, `Why ${q.a[0]} is right: `), right.join(' ')) : '',
+    by ? h('div', { class: 'muted small' }, by) : '',
+  );
+  fill(explainLocal(q, given));
+  if (getApiKey() && !q.inputLang) {
+    const status = h('div', { class: 'muted small' }, 'Gemini is explaining…');
+    el.append(status);
+    explainMistake(q, given)
+      .then((x) => {
+        if (!x?.wrong || !x?.right) throw new Error('empty explanation');
+        fill({ wrong: [x.wrong], right: [x.right] }, x.alsoCorrect ? 'Gemini thinks your answer is also correct. If you agree, press “I was right”.' : 'Explained by Gemini');
+      })
+      .catch((e) => (status.textContent = `Gemini couldn't explain (${e.message}).`));
+  }
+  return el;
 }
 
 function promptHtml(q) {
@@ -66,7 +99,7 @@ export function runQuiz(root, opts) {
     const correct = results.filter((r) => r.ok).length;
     top.replaceChildren(
       h('span', { class: 'progress' }, sprint ? `✓ ${correct}` : `${Math.min(idx + 1, qs.length)}${total}`),
-      q?.topicTitle ? h('span', { class: 'chip' }, q.topicId ? `L${q.topicId.split('.')[0]} · ${q.topicTitle}` : q.topicTitle) : '',
+      q?.topicTitle ? h('span', { class: 'chip' }, chipLabel(q)) : '',
       h('span', { class: 'spacer' }),
       sprint ? h('span', { class: 'timer', id: 'quiz-timer' }, '') : h('span', { class: 'muted small' }, `${correct} correct`),
       opts.onExit ? h('button', { class: 'btn ghost small', onclick: () => { stop(); opts.onExit(); } }, 'Exit') : '',
@@ -157,7 +190,7 @@ export function runQuiz(root, opts) {
         sentence !== q.a[0] ? h('div', { class: 'ko sentence' }, sentence) : '',
         q.a.length > 1 ? h('div', { class: 'muted small' }, `Also accepted: ${q.a.slice(1).join(' · ')}`) : '',
         !ok && given.trim() ? h('div', { class: 'muted small' }, `You wrote: ${given}`) : '',
-        q.note ? h('div', { class: 'note' }, q.note) : '',
+        !ok && given.trim() ? explainBlock(q, given) : q.note ? h('div', { class: 'note' }, q.note) : '',
         !ok && given.trim()
           ? h('button', { type: 'button', class: 'btn ghost small', onclick: (e) => { results[results.length - 1].ok = true; opts.onAnswer?.(q, true, given, idx - 1, true); e.target.replaceWith(h('span', { class: 'muted small' }, 'Counted as correct.')); renderTopCounts(); } }, 'I was right')
           : '',

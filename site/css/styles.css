@@ -254,3 +254,4 @@ th, td { text-align: left; padding: .3rem .4rem; border-bottom: 1px solid var(--
   nav { margin-left: 0; width: 100%; justify-content: space-between; }
   nav a { padding: .35rem .5rem; font-size: .9rem; }
 }
+.explain { margin-top: .5rem; font-size: .88rem; padding: .5rem .7rem; border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 8px 8px 0; display: grid; gap: .35rem; }
