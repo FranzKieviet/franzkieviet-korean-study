@@ -1,14 +1,16 @@
 import { h, toast } from '../dom.js';
-import { state, save, recordResult, overrideResult, markDailyDone, currentStreak, accuracy } from '../state.js';
+import { state, save, recordResult, overrideResult, markDailyDone, currentStreak, accuracy, wordsToReview } from '../state.js';
 import { makeRng, todayStr } from '../rng.js';
 import { grammarQuestions, pickTopics, verbQuestion, numberQuestion, learnedForms } from '../practice.js';
 import { aiEnabled, aiGrammarQuestions } from '../ai.js';
 import { ALL_VERBS } from '../data/words.js';
 import { topicById, makeQuestion } from '../data/grammar.js';
 import { runQuiz } from '../quiz.js';
-import { dayIndex, weekIndex, wordsForDay, hanjaForWeek, wordList, hanjaList, ankiButtons, isSunday } from './words.js';
+import { dayIndex, weekIndex, wordsForDay, hanjaForWeek, wordList, hanjaList, ankiButtons, isSunday, savedWordQuestion } from './words.js';
 
 const DAILY_NUM_CATS = ['sinoSmall', 'sinoBig', 'native', 'counters', 'money', 'time', 'dates', 'days', 'months', 'age', 'phone'];
+
+const SAVED_PER_DAY = 3;
 
 const learnedIds = () => Object.keys(state.learned).filter((k) => state.learned[k]);
 
@@ -38,8 +40,9 @@ async function buildDaily(date) {
   const forms = learnedForms();
   const verbs = Array.from({ length: 4 }, () => verbQuestion(r, ALL_VERBS, forms));
   const nums = Array.from({ length: 4 }, () => numberQuestion(r, DAILY_NUM_CATS, 'read'));
+  const saved = wordsToReview().slice(0, SAVED_PER_DAY).map(savedWordQuestion);
   // grammar first in a shuffled order, with drills sprinkled in
-  const questions = r.shuffle([...grammar, ...verbs, ...nums]);
+  const questions = r.shuffle([...grammar, ...verbs, ...nums, ...saved]);
   return { questions, results: [], done: false, learnedKey: ids.join(','), source };
 }
 
@@ -106,7 +109,7 @@ export function renderToday(main, ctx) {
   const di = dayIndex();
   const wi = weekIndex();
   const answered = daily ? daily.results.length : 0;
-  const total = daily ? daily.questions.length : (ids.length ? state.settings.dailyCount : 0) + 8;
+  const total = daily ? daily.questions.length : (ids.length ? state.settings.dailyCount : 0) + 8 + Math.min(SAVED_PER_DAY, wordsToReview().length);
   const correct = daily ? daily.results.filter((r) => r.ok).length : 0;
   const learnedChanged = daily && !daily.done && daily.learnedKey !== ids.join(',');
 
@@ -128,7 +131,7 @@ export function renderToday(main, ctx) {
       h('h2', {}, 'Daily review'),
       h('p', { class: 'muted' }, daily?.done
         ? `Done for today: ${correct} / ${daily.results.length} correct. 잘했어요! New questions tomorrow.`
-        : `${total} questions: grammar from your ${ids.length} learned topic${ids.length === 1 ? '' : 's'}, plus verb conjugations and numbers.`,
+        : `${total} questions: grammar from your ${ids.length} learned topic${ids.length === 1 ? '' : 's'}, plus verb conjugations and numbers${wordsToReview().length ? ' and your saved words' : ''}.`,
         daily?.source === 'gemini' ? ' Grammar questions written by Gemini.' : !daily && aiEnabled() ? ' Gemini will write the grammar questions.' : ''),
       daily && !daily.done && answered ? h('div', { class: 'bar' }, h('div', { style: `width:${(answered / total) * 100}%` })) : '',
       h('div', { class: 'row-actions' },

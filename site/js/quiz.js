@@ -2,10 +2,11 @@
 import { h, esc } from './dom.js';
 import { norm } from './hangul.js';
 import { speak, speakButton } from './tts.js';
-import { state } from './state.js';
+import { state, recordWord } from './state.js';
 import { LESSONS } from './data/grammar.js';
 import { explainLocal } from './explain.js';
 import { getApiKey, explainMistake } from './ai.js';
+import { tappable, closeTap } from './wordtap.js';
 
 const stripHints = (s) => s.replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
 
@@ -58,8 +59,11 @@ function explainBlock(q, given) {
   return el;
 }
 
-function promptHtml(q) {
-  return esc(q.q).replace('___', '<span class="blank">＿＿＿</span>');
+/** The Korean prompt, with the blank, and every word tappable (except flashcards, where that gives the answer away). */
+function promptEl(q) {
+  if (q.self || q.noTap) return h('div', { class: 'prompt ko', html: esc(q.q).replace('___', '<span class="blank">＿＿＿</span>') });
+  const [before, ...rest] = q.q.split('___');
+  return h('div', { class: 'prompt ko' }, tappable(before), rest.length ? [h('span', { class: 'blank' }, '＿＿＿'), tappable(rest.join('___'))] : '');
 }
 
 /**
@@ -123,16 +127,19 @@ export function runQuiz(root, opts) {
     const feedback = h('div', { class: 'feedback', 'aria-live': 'polite' });
     const reveal = h('button', { type: 'button', class: 'btn ghost small' }, q.self ? 'Reveal' : 'Show answer');
 
-    const promptEl = q.audio
+    const prompt = q.audio
       ? h('div', { class: 'prompt audio' }, h('button', { type: 'button', class: 'btn big-speak', onclick: () => speak(q.audio) }, '🔊 Play again'))
-      : q.q ? h('div', { class: 'prompt ko', html: promptHtml(q) }) : '';
+      : q.q ? promptEl(q) : '';
 
+    // word quizzes ask for the very word a tap would show
+    const tap = !(q.self || q.audio || q.noTap);
+    closeTap();
     card.replaceChildren(
-      q.cue ? h('div', { class: 'cue' }, q.cue) : '',
-      promptEl,
-      q.en ? h('div', { class: 'en' }, q.en) : '',
+      q.cue ? h('div', { class: 'cue' }, tap ? tappable(q.cue) : q.cue) : '',
+      prompt,
+      q.en ? h('div', { class: 'en' }, tap ? tappable(q.en) : q.en) : '',
       q.self ? '' : form,
-      h('div', { class: 'row-actions' }, reveal),
+      h('div', { class: 'row-actions' }, reveal, !tap ? '' : h('span', { class: 'muted small tap-tip' }, 'Tip: tap a word to look it up and save it for review.')),
       feedback,
     );
 
@@ -186,13 +193,13 @@ export function runQuiz(root, opts) {
       feedback.className = `feedback ${ok ? 'ok' : 'bad'}`;
       feedback.replaceChildren(
         h('div', { class: 'verdict' }, ok ? `✓ Correct · ${elapsed}s` : revealed ? 'Answer' : '✗ Not quite'),
-        h('div', { class: 'answer-line' }, h('span', { class: 'ko big' }, q.a[0]), speakButton(spoken)),
-        sentence !== q.a[0] ? h('div', { class: 'ko sentence' }, sentence) : '',
+        h('div', { class: 'answer-line' }, tappable(q.a[0], 'ko big'), speakButton(spoken)),
+        sentence !== q.a[0] ? tappable(sentence, 'ko sentence') : '',
         q.a.length > 1 ? h('div', { class: 'muted small' }, `Also accepted: ${q.a.slice(1).join(' · ')}`) : '',
         !ok && given.trim() ? h('div', { class: 'muted small' }, `You wrote: ${given}`) : '',
         !ok && given.trim() ? explainBlock(q, given) : q.note ? h('div', { class: 'note' }, q.note) : '',
         !ok && given.trim()
-          ? h('button', { type: 'button', class: 'btn ghost small', onclick: (e) => { results[results.length - 1].ok = true; opts.onAnswer?.(q, true, given, idx - 1, true); e.target.replaceWith(h('span', { class: 'muted small' }, 'Counted as correct.')); renderTopCounts(); } }, 'I was right')
+          ? h('button', { type: 'button', class: 'btn ghost small', onclick: (e) => { results[results.length - 1].ok = true; if (q.savedWord) recordWord(q.savedWord, true); opts.onAnswer?.(q, true, given, idx - 1, true); e.target.replaceWith(h('span', { class: 'muted small' }, 'Counted as correct.')); renderTopCounts(); } }, 'I was right')
           : '',
       );
       record(ok, given, false);
@@ -211,6 +218,7 @@ export function runQuiz(root, opts) {
   function record(ok, given, advance) {
     const q = qs[idx];
     results.push({ ok, given });
+    if (q.savedWord) recordWord(q.savedWord, ok);
     opts.onAnswer?.(q, ok, given, idx);
     idx++;
     if (advance) {
@@ -232,6 +240,7 @@ export function runQuiz(root, opts) {
   function done() {
     if (finished) return;
     finished = true;
+    closeTap();
     stop();
     const answeredQs = qs.slice(0, results.length);
     const correct = results.filter((r) => r.ok).length;

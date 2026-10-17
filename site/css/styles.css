@@ -255,3 +255,15 @@ th, td { text-align: left; padding: .3rem .4rem; border-bottom: 1px solid var(--
   nav a { padding: .35rem .5rem; font-size: .9rem; }
 }
 .explain { margin-top: .5rem; font-size: .88rem; padding: .5rem .7rem; border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 8px 8px 0; display: grid; gap: .35rem; }
+.sentence { display: block; }
+.tap { cursor: pointer; border-bottom: 1px dotted color-mix(in srgb, var(--muted) 60%, transparent); border-radius: 3px; }
+.tap:hover { background: var(--accent-soft); border-bottom-color: var(--accent); }
+.tap-tip { margin-left: auto; }
+.tap-pop { position: absolute; z-index: 50; max-width: min(22rem, calc(100vw - 16px)); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, .18); padding: .55rem .7rem; display: grid; gap: .5rem; font-size: .92rem; }
+.tap-row { display: grid; gap: .35rem; }
+.tap-row + .tap-row { border-top: 1px solid var(--border); padding-top: .5rem; }
+.tap-word { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.tap-word .ko { font-size: 1.15rem; font-weight: 600; }
+.tap-meaning { font: inherit; padding: .3rem .5rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+.tap-row .btn { justify-self: start; }
+.word-list .spacer { flex: 1; }

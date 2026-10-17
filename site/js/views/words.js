@@ -1,5 +1,5 @@
 import { h, toast } from '../dom.js';
-import { state, save } from '../state.js';
+import { state, save, removeWord, wordsToReview, KNOWN_AFTER } from '../state.js';
 import { todayStr, daysBetween, makeRng } from '../rng.js';
 import { WORDS, HANJA } from '../data/vocab.js';
 import { speakButton } from '../tts.js';
@@ -83,6 +83,54 @@ export function ankiButtons(kind, indexes, label) {
   return h('div', { class: 'row-actions' }, send, dl);
 }
 
+/** A quiz question for a word saved from a question (no meaning saved → say-it flashcard). */
+export function savedWordQuestion(w) {
+  return w.en
+    ? { q: '', cue: `In Korean: ${w.en}`, a: [w.ko], speak: w.ko, topicTitle: 'My words', savedWord: w.ko, noTap: true }
+    : { q: w.ko, cue: 'Do you remember what it means? Say it, then reveal.', a: [w.ko], speak: w.ko, self: true, topicTitle: 'My words', savedWord: w.ko };
+}
+
+function savedSection(main) {
+  const all = Object.entries(state.myWords).map(([ko, w]) => ({ ko, ...w })).sort((a, b) => b.added.localeCompare(a.added));
+  const area = h('div');
+  const cards = () => all.map((w) => ({ front: w.ko, back: w.en || '?', tags: ['saved-word'] }));
+
+  function practice() {
+    const r = makeRng();
+    const learning = wordsToReview();
+    const pool = (learning.length ? learning : all).slice(0, 20);
+    runQuiz(area, { questions: r.shuffle(pool).map(savedWordQuestion), onExit: () => renderWords(main) });
+    area.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function send(btn) {
+    btn.disabled = true;
+    try {
+      const { added, skipped } = await addCards(state.settings.deckWords, cards());
+      toast(`Added ${added} card${added === 1 ? '' : 's'} to "${state.settings.deckWords}"${skipped ? ` (${skipped} already there)` : ''}.`, 'good');
+    } catch {
+      toast('Could not reach Anki. Is Anki open with AnkiConnect installed? See Settings → Anki. You can download the file instead.', 'bad');
+    }
+    btn.disabled = false;
+  }
+
+  return h('section', { class: 'card', id: 'my-words' },
+    h('h2', {}, 'My saved words ', all.length ? h('span', { class: 'pill' }, String(all.length)) : ''),
+    h('p', { class: 'muted small' }, all.length
+      ? `Words you tapped and saved in questions. A few show up in each daily review until you get them right ${KNOWN_AFTER} times in a row.`
+      : 'Nothing saved yet. While practicing, tap any word in a question (Korean or English) to see what it means and save it here for review.'),
+    all.length ? h('ul', { class: 'word-list' }, ...all.map((w) => h('li', {},
+      h('span', { class: 'ko word' }, w.ko), speakButton(w.ko), h('span', { class: 'en' }, w.en || '—'),
+      h('span', { class: 'spacer' }),
+      h('span', { class: `acc ${(w.ok || 0) >= KNOWN_AFTER ? 'good' : 'none'}`, title: `${w.ok || 0} right in a row` }, (w.ok || 0) >= KNOWN_AFTER ? 'known' : `${w.ok || 0}/${KNOWN_AFTER}`),
+      h('button', { class: 'btn ghost small', title: 'Remove', 'aria-label': `Remove ${w.ko}`, onclick: () => { removeWord(w.ko); renderWords(main); } }, '✕')))) : '',
+    all.length ? h('div', { class: 'row-actions top-gap' },
+      h('button', { class: 'btn primary', onclick: practice }, 'Practice saved words'),
+      h('button', { class: 'btn small', onclick: (e) => send(e.currentTarget) }, 'Add to Anki'),
+      h('button', { class: 'btn small', onclick: () => downloadAnkiFile(`korean-saved-words-${todayStr()}.txt`, state.settings.deckWords, cards()) }, 'Download for Anki')) : '',
+    area);
+}
+
 export function renderWords(main) {
   const di = dayIndex();
   const wi = weekIndex();
@@ -96,7 +144,7 @@ export function renderWords(main) {
     const r = makeRng();
     const pool = r.shuffle(learnedWords).slice(0, 20);
     const questions = pool.map((w) => (mode === 'type'
-      ? { q: '', cue: `In Korean: ${w.en}`, a: [w.ko], speak: w.ko, topicTitle: 'Words' }
+      ? { q: '', cue: `In Korean: ${w.en}`, a: [w.ko], speak: w.ko, topicTitle: 'Words', noTap: true }
       : { q: w.ko, cue: 'What does it mean? Say it, then reveal.', a: [w.en], speak: w.ko, self: true, topicTitle: 'Words' }));
     runQuiz(quizArea, { questions, onExit: () => renderWords(main) });
     quizArea.scrollIntoView({ behavior: 'smooth' });
@@ -111,6 +159,7 @@ export function renderWords(main) {
       ankiButtons('words', [di], "today's words"),
       unsentDays.length > 1 ? h('div', { class: 'small muted top-gap' }, `${unsentDays.length} days not sent to Anki yet. `,
         (() => { const b = h('button', { class: 'btn ghost small' }, 'Send all'); b.addEventListener('click', () => sendToAnki('words', unsentDays, b)); return b; })()) : ''),
+    savedSection(main),
     h('section', { class: 'card' },
       h('h2', {}, 'This week’s hanja ', isSunday() ? h('span', { class: 'badge' }, 'New today!') : ''),
       hanjaList(hanjaForWeek(wi)),

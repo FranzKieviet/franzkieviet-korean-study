@@ -11,6 +11,7 @@ const DEFAULTS = () => ({
   streak: { last: null, count: 0 },
   anki: { words: {}, hanja: {} }, // dayIndex/weekIndex -> true when sent
   best: {}, // drill key -> best score
+  myWords: {}, // ko -> { en, added: date, ok: correct answers in a row } — words saved from questions for review
   settings: {
     dailyCount: 15,
     aiQuestions: true, // used only once a Gemini API key is saved
@@ -64,6 +65,34 @@ export function overrideResult(topicId) {
   s.w--;
   s.c++;
   save();
+}
+
+/** Words you saved for review (tapped in a question). After 3 right in a row they count as known. */
+export const KNOWN_AFTER = 3;
+
+export function saveWord(ko, en) {
+  state.myWords[ko] = { en, added: todayStr(), ok: 0 };
+  save();
+}
+
+export function removeWord(ko) {
+  delete state.myWords[ko];
+  save();
+}
+
+export function recordWord(ko, ok) {
+  const w = state.myWords[ko];
+  if (!w) return;
+  w.ok = ok ? (w.ok || 0) + 1 : 0;
+  save();
+}
+
+/** Saved words still being learned, least-known first. */
+export function wordsToReview() {
+  return Object.entries(state.myWords)
+    .filter(([, w]) => (w.ok || 0) < KNOWN_AFTER)
+    .sort(([, a], [, b]) => (a.ok || 0) - (b.ok || 0) || a.added.localeCompare(b.added))
+    .map(([ko, w]) => ({ ko, ...w }));
 }
 
 export function accuracy(topicId) {
