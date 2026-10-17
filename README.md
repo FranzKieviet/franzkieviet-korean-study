@@ -2,7 +2,7 @@
 
 A small static site for daily Korean practice:
 
-- **Today**: a daily review (seeded by date, so it stays the same all day) built from the grammar topics you've ticked, plus verb conjugations and numbers. It leans toward your weakest topics. It also shows 5 new words every day and 5 new hanja every Sunday, with one-click "Add to Anki".
+- **Today**: a daily review (seeded by date, so it stays the same all day) built from the grammar topics you've ticked, plus verb conjugations and numbers. It leans toward your weakest topics. It also shows a set of 5 new words (you get a fresh set each time you add one to Anki, so breaks never pile up words) and 5 new hanja every Sunday, with one-click "Add to Anki".
 - **Grammar**: all 93 topics from *Anytime Korean Beginning 1 & 2* (Lessons 1–20). Tick what you've learned, read the explanations and examples (with audio), and practice by topic, by lesson or everything you've learned.
 - **Numbers**: Sino-Korean and native numbers, counters, age, money, time, dates, years, days of the week, months and phone numbers. Four modes: read, listen, Korean → number, and say it aloud. 60-second sprints with a best score.
 - **Verbs**: fast conjugation drills for 27 forms (present, past, honorific, -(으)ㄹ게요, -는데, modifiers, -습니다 …), including ㅂ/ㄷ/ㅅ/르/ㅎ/ㄹ/ㅡ irregulars, plus a conjugation table.

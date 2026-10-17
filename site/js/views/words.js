@@ -1,19 +1,14 @@
 import { h, toast } from '../dom.js';
 import { state, save, removeWord, wordsToReview, KNOWN_AFTER } from '../state.js';
 import { todayStr, daysBetween, makeRng } from '../rng.js';
-import { WORDS, HANJA } from '../data/vocab.js';
+import { HANJA } from '../data/vocab.js';
 import { speakButton } from '../tts.js';
-import { addCards, downloadAnkiFile, wordCard, hanjaCard } from '../anki.js';
+import { addCards, downloadAnkiFile, hanjaCard } from '../anki.js';
 import { runQuiz } from '../quiz.js';
-
-export const PER_DAY = 5;
+import { currentSet, setStatus, restore, setSentToAnki, markSent, upcoming, wordsWith, STATUS } from '../vocab-plan.js';
 
 export function dayIndex() {
   return Math.max(0, daysBetween(state.startDate, todayStr()));
-}
-
-export function wordsForDay(i) {
-  return Array.from({ length: PER_DAY }, (_, k) => WORDS[(i * PER_DAY + k) % WORDS.length]);
 }
 
 function parseDate(s) {
@@ -36,11 +31,6 @@ export function hanjaForWeek(i) {
 
 export const isSunday = () => new Date().getDay() === 0;
 
-export function wordList(words) {
-  return h('ul', { class: 'word-list' }, ...words.map((w) => h('li', {},
-    h('span', { class: 'ko word' }, w.ko), speakButton(w.ko), h('span', { class: 'en' }, w.en))));
-}
-
 export function hanjaList(list) {
   return h('div', { class: 'hanja-grid' }, ...list.map((x) => h('div', { class: 'hanja-card' },
     h('div', { class: 'hanja' }, x.h),
@@ -49,38 +39,125 @@ export function hanjaList(list) {
     h('ul', { class: 'small hanja-ex' }, ...x.ex.map((e) => h('li', {}, e))))));
 }
 
-async function sendToAnki(kind, indexes, btn) {
-  const isWords = kind === 'words';
-  const deck = isWords ? state.settings.deckWords : state.settings.deckHanja;
-  const cards = indexes.flatMap((i) => (isWords ? wordsForDay(i).map((w) => wordCard(w, i)) : hanjaForWeek(i).map((x) => hanjaCard(x, i))));
+const wordCard = (w) => ({ front: w.ko, back: w.en, tags: ['daily-word', `added-${todayStr()}`] });
+const ANKI_DOWN = 'Could not reach Anki. Is Anki open with AnkiConnect installed? See Settings → Anki. You can download the file instead.';
+
+/** Send cards; returns true when Anki took them. */
+async function sendCards(deck, cards, btn) {
   btn.disabled = true;
   const old = btn.textContent;
   btn.textContent = 'Sending…';
   try {
     const { added, skipped } = await addCards(deck, cards);
-    indexes.forEach((i) => (state.anki[kind][i] = true));
-    save();
     toast(`Added ${added} card${added === 1 ? '' : 's'} to "${deck}"${skipped ? ` (${skipped} already there)` : ''}.`, 'good');
-    btn.textContent = '✓ In Anki';
+    return true;
   } catch (e) {
     console.warn(e);
-    toast('Could not reach Anki. Is Anki open with AnkiConnect installed? See Settings → Anki. You can download the file instead.', 'bad');
+    toast(ANKI_DOWN, 'bad');
     btn.textContent = old;
     btn.disabled = false;
+    return false;
   }
 }
 
-export function ankiButtons(kind, indexes, label) {
-  const sent = indexes.every((i) => state.anki[kind][i]);
+/** Hanja: one set per week. */
+export function ankiButtons(indexes, label) {
+  const sent = indexes.every((i) => state.anki.hanja[i]);
   const send = h('button', { class: 'btn primary small' }, sent ? '✓ In Anki' : `Add ${label} to Anki`);
-  send.addEventListener('click', () => sendToAnki(kind, indexes, send));
-  const dl = h('button', { class: 'btn small', title: 'Download a file for Anki → File → Import' }, 'Download for Anki');
-  dl.addEventListener('click', () => {
-    const isWords = kind === 'words';
-    const cards = indexes.flatMap((i) => (isWords ? wordsForDay(i).map((w) => wordCard(w, i)) : hanjaForWeek(i).map((x) => hanjaCard(x, i))));
-    downloadAnkiFile(`korean-${kind}-${todayStr()}.txt`, isWords ? state.settings.deckWords : state.settings.deckHanja, cards);
+  const cards = () => indexes.flatMap((i) => hanjaForWeek(i).map((x) => hanjaCard(x, i)));
+  send.addEventListener('click', async () => {
+    if (!(await sendCards(state.settings.deckHanja, cards(), send))) return;
+    indexes.forEach((i) => (state.anki.hanja[i] = true));
+    save();
+    send.textContent = '✓ In Anki';
   });
+  const dl = h('button', { class: 'btn small', title: 'Download a file for Anki → File → Import' }, 'Download for Anki');
+  dl.addEventListener('click', () => downloadAnkiFile(`korean-hanja-${todayStr()}.txt`, state.settings.deckHanja, cards()));
   return h('div', { class: 'row-actions' }, send, dl);
+}
+
+/**
+ * The current set of new words, each with "I know it" / "Skip" (a new word takes its place).
+ * Adding them to Anki moves them to "studying" and brings a fresh set. onChange re-renders the page.
+ */
+export function todaysWordsCard(onChange) {
+  const set = currentSet();
+  const unsent = wordsWith('studying').filter((w) => !w.anki);
+  const remove = (ko, s) => { setStatus(ko, s); onChange(); };
+
+  const send = h('button', { class: 'btn primary small' }, 'Add to Anki → new words');
+  send.addEventListener('click', async () => {
+    if (!(await sendCards(state.settings.deckWords, set.map(wordCard), send))) return;
+    setSentToAnki();
+    onChange();
+  });
+  const dl = h('button', { class: 'btn small', title: 'Download a file for Anki → File → Import, then get new words' }, 'Download for Anki → new words');
+  dl.addEventListener('click', () => {
+    downloadAnkiFile(`korean-words-${todayStr()}.txt`, state.settings.deckWords, set.map(wordCard));
+    setSentToAnki();
+    onChange();
+  });
+  const sendOld = h('button', { class: 'btn ghost small' }, 'Send them too');
+  sendOld.addEventListener('click', async () => {
+    if (!(await sendCards(state.settings.deckWords, unsent.map(wordCard), sendOld))) return;
+    markSent(unsent.map((w) => w.ko));
+    onChange();
+  });
+
+  return h('section', { class: 'card' },
+    h('h2', {}, 'New words'),
+    set.length
+      ? h('ul', { class: 'word-list' }, ...set.map((w) => h('li', {},
+        h('span', { class: 'ko word' }, w.ko), speakButton(w.ko), h('span', { class: 'en' }, w.en),
+        h('span', { class: 'spacer' }),
+        h('span', { class: 'word-actions' },
+          h('button', { class: 'btn ghost small', title: 'I already know this word', onclick: () => remove(w.ko, 'known') }, 'I know it'),
+          h('button', { class: 'btn ghost small', title: 'Not useful for me', onclick: () => remove(w.ko, 'skip') }, 'Skip')))))
+      : h('p', { class: 'muted' }, 'You have gone through every word in the list. 대단해요!'),
+    set.length ? h('p', { class: 'muted small' }, 'Remove words you know or don’t need and a new one takes their place. You get a fresh set when you add these to Anki, so take breaks whenever you like: nothing piles up.') : '',
+    set.length ? h('div', { class: 'row-actions' }, send, dl) : '',
+    unsent.length ? h('div', { class: 'small muted top-gap' }, `${unsent.length} word${unsent.length === 1 ? '' : 's'} you're studying ${unsent.length === 1 ? "isn't" : "aren't"} in Anki yet. `, sendOld) : '');
+}
+
+/** Browse every word by status: remove upcoming ones you know or don't need, or bring removed ones back. */
+function browseSection(main) {
+  const tabs = { upcoming: 'Upcoming', studying: STATUS.studying, known: STATUS.known, skip: STATUS.skip };
+  let tab = 'upcoming';
+  let query = '';
+  const list = h('ul', { class: 'word-list browse-list' });
+  const tabBar = h('div', { class: 'chips' });
+  const search = h('input', { type: 'search', class: 'browse-search', placeholder: 'Search Korean or English…', 'aria-label': 'Search words' });
+  search.addEventListener('input', () => { query = search.value.trim().toLowerCase(); paint(); });
+
+  const items = (t) => (t === 'upcoming' ? upcoming() : wordsWith(t));
+  const act = (label, title, fn) => h('button', { class: 'btn ghost small', title, onclick: () => { fn(); paint(); } }, label);
+
+  function paint() {
+    tabBar.replaceChildren(...Object.entries(tabs).map(([k, label]) => h('button', {
+      class: `chip-check${k === tab ? ' on' : ''}`, 'aria-pressed': String(k === tab), onclick: () => { tab = k; paint(); },
+    }, `${label} (${items(k).length})`)));
+    const all = items(tab).filter((w) => !query || w.ko.includes(query) || w.en.toLowerCase().includes(query));
+    const shown = all.slice(0, 300);
+    list.replaceChildren(
+      ...shown.map((w) => h('li', {},
+        h('span', { class: 'ko word' }, w.ko), speakButton(w.ko), h('span', { class: 'en' }, w.en),
+        h('span', { class: 'spacer' }),
+        h('span', { class: 'word-actions' },
+          tab === 'upcoming' || tab === 'studying'
+            ? [act('I know it', 'I already know this word', () => setStatus(w.ko, 'known')), act('Skip', 'Not useful for me', () => setStatus(w.ko, 'skip'))]
+            : [act(tab === 'known' ? 'Not known' : 'Unskip', 'Put it back in the upcoming words', () => restore(w.ko))]))),
+      all.length > shown.length ? h('li', { class: 'muted small' }, `…and ${all.length - shown.length} more. Search to narrow it down.`) : '',
+      !all.length ? h('li', { class: 'muted small' }, query ? 'No matches.' : 'Nothing here yet.') : '');
+  }
+  paint();
+
+  const details = h('details', { class: 'card' },
+    h('summary', {}, 'Browse all words'),
+    h('p', { class: 'muted small' }, 'Upcoming words come next in your sets, most useful first. Mark the ones you already know or don’t need and they’ll never be suggested. Words you’ve added to Anki are under Studying.'),
+    tabBar, search, list);
+  // removing an upcoming word can change today's set, so refresh the page when the browser is closed
+  details.addEventListener('toggle', () => { if (!details.open) renderWords(main); });
+  return details;
 }
 
 /** A quiz question for a word saved from a question (no meaning saved → say-it flashcard). */
@@ -132,17 +209,15 @@ function savedSection(main) {
 }
 
 export function renderWords(main) {
-  const di = dayIndex();
   const wi = weekIndex();
-  const unsentDays = Array.from({ length: di + 1 }, (_, i) => i).filter((i) => !state.anki.words[i]);
   const unsentWeeks = Array.from({ length: wi + 1 }, (_, i) => i).filter((i) => !state.anki.hanja[i]);
-  const learnedWords = Array.from({ length: di + 1 }, (_, i) => wordsForDay(i)).flat();
+  const studyWords = [...currentSet(), ...wordsWith('studying')];
 
   const quizArea = h('div');
 
   function startQuiz(mode) {
     const r = makeRng();
-    const pool = r.shuffle(learnedWords).slice(0, 20);
+    const pool = r.shuffle(studyWords).slice(0, 20);
     const questions = pool.map((w) => (mode === 'type'
       ? { q: '', cue: `In Korean: ${w.en}`, a: [w.ko], speak: w.ko, topicTitle: 'Words', noTap: true }
       : { q: w.ko, cue: 'What does it mean? Say it, then reveal.', a: [w.en], speak: w.ko, self: true, topicTitle: 'Words' }));
@@ -150,32 +225,32 @@ export function renderWords(main) {
     quizArea.scrollIntoView({ behavior: 'smooth' });
   }
 
+  const sendWeeks = h('button', { class: 'btn ghost small' }, 'Send all');
+  sendWeeks.addEventListener('click', async () => {
+    const cards = unsentWeeks.flatMap((i) => hanjaForWeek(i).map((x) => hanjaCard(x, i)));
+    if (!(await sendCards(state.settings.deckHanja, cards, sendWeeks))) return;
+    unsentWeeks.forEach((i) => (state.anki.hanja[i] = true));
+    save();
+    renderWords(main);
+  });
+
   main.replaceChildren(
     h('header', { class: 'page-head' }, h('h1', {}, 'Words & Hanja'),
-      h('p', { class: 'muted' }, `Day ${di + 1} · 5 new words every day, 5 new hanja every Sunday.`)),
-    h('section', { class: 'card' },
-      h('h2', {}, "Today's words"),
-      wordList(wordsForDay(di)),
-      ankiButtons('words', [di], "today's words"),
-      unsentDays.length > 1 ? h('div', { class: 'small muted top-gap' }, `${unsentDays.length} days not sent to Anki yet. `,
-        (() => { const b = h('button', { class: 'btn ghost small' }, 'Send all'); b.addEventListener('click', () => sendToAnki('words', unsentDays, b)); return b; })()) : ''),
+      h('p', { class: 'muted' }, `5 new words each time you add a set to Anki, 5 new hanja every Sunday. You're studying ${wordsWith('studying').length} words.`)),
+    todaysWordsCard(() => renderWords(main)),
     savedSection(main),
     h('section', { class: 'card' },
       h('h2', {}, 'This week’s hanja ', isSunday() ? h('span', { class: 'badge' }, 'New today!') : ''),
       hanjaList(hanjaForWeek(wi)),
-      ankiButtons('hanja', [wi], "this week's hanja"),
-      unsentWeeks.length > 1 ? h('div', { class: 'small muted top-gap' }, `${unsentWeeks.length} weeks not sent to Anki yet. `,
-        (() => { const b = h('button', { class: 'btn ghost small' }, 'Send all'); b.addEventListener('click', () => sendToAnki('hanja', unsentWeeks, b)); return b; })()) : ''),
+      ankiButtons([wi], "this week's hanja"),
+      unsentWeeks.length > 1 ? h('div', { class: 'small muted top-gap' }, `${unsentWeeks.length} weeks not sent to Anki yet. `, sendWeeks) : ''),
     h('section', { class: 'card' },
-      h('h2', {}, 'Review words so far'),
-      h('p', { class: 'muted small' }, `${learnedWords.length} words so far.`),
+      h('h2', {}, 'Review your words'),
+      h('p', { class: 'muted small' }, `${studyWords.length} words: your new set plus the ones you're studying.`),
       h('div', { class: 'row-actions' },
         h('button', { class: 'btn primary', onclick: () => startQuiz('type') }, 'English → type Korean'),
         h('button', { class: 'btn', onclick: () => startQuiz('cards') }, 'Korean → meaning (flashcards)')),
       quizArea),
-    h('details', { class: 'card' },
-      h('summary', {}, 'All words so far'),
-      ...Array.from({ length: di + 1 }, (_, i) => di - i).map((i) => h('div', { class: 'day-block' },
-        h('h3', {}, `Day ${i + 1}`), wordList(wordsForDay(i))))),
+    browseSection(main),
   );
 }

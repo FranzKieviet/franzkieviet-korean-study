@@ -267,3 +267,12 @@ th, td { text-align: left; padding: .3rem .4rem; border-bottom: 1px solid var(--
 .tap-meaning { font: inherit; padding: .3rem .5rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
 .tap-row .btn { justify-self: start; }
 .word-list .spacer { flex: 1; }
+.word-actions { display: inline-flex; gap: .15rem; flex-shrink: 0; }
+.word-list li:has(.word-actions) { display: grid; grid-template-columns: minmax(4rem, auto) auto 1fr auto; column-gap: .5rem; }
+.word-list li:has(.word-actions) .word { min-width: 0; }
+.word-list li:has(.word-actions) .spacer { display: none; }
+.word-actions .btn.small { padding: .3rem .45rem; }
+.chip-check.on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); font: inherit; font-size: .9rem; }
+button.chip-check { font: inherit; font-size: .9rem; color: var(--text); }
+.browse-search { width: 100%; margin: .75rem 0 .25rem; font: inherit; padding: .5rem .7rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }
+.browse-list { max-height: 28rem; overflow-y: auto; }

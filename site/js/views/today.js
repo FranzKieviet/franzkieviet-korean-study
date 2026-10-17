@@ -6,7 +6,7 @@ import { aiEnabled, aiGrammarQuestions } from '../ai.js';
 import { ALL_VERBS } from '../data/words.js';
 import { topicById, makeQuestion } from '../data/grammar.js';
 import { runQuiz } from '../quiz.js';
-import { dayIndex, weekIndex, wordsForDay, hanjaForWeek, wordList, hanjaList, ankiButtons, isSunday, savedWordQuestion } from './words.js';
+import { weekIndex, hanjaForWeek, hanjaList, ankiButtons, isSunday, savedWordQuestion, todaysWordsCard } from './words.js';
 
 const DAILY_NUM_CATS = ['sinoSmall', 'sinoBig', 'native', 'counters', 'money', 'time', 'dates', 'days', 'months', 'age', 'phone'];
 
@@ -106,7 +106,6 @@ export function renderToday(main, ctx) {
     if ((await build(btn)) && stillHere(btn)) renderToday(main, ctx);
   }
 
-  const di = dayIndex();
   const wi = weekIndex();
   const answered = daily ? daily.results.length : 0;
   const total = daily ? daily.questions.length : (ids.length ? state.settings.dailyCount : 0) + 8 + Math.min(SAVED_PER_DAY, wordsToReview().length);
@@ -141,14 +140,11 @@ export function renderToday(main, ctx) {
         learnedChanged ? h('button', { class: 'btn ghost small', onclick: regenerate, title: 'You changed your learned topics' }, 'Rebuild with my new topics') : '')),
 
     h('div', { class: 'grid-2' },
-      h('section', { class: 'card' },
-        h('h2', {}, 'Today’s 5 words'),
-        wordList(wordsForDay(di)),
-        ankiButtons('words', [di], 'words')),
+      todaysWordsCard(() => renderToday(main, ctx)),
       h('section', { class: 'card' },
         h('h2', {}, 'This week’s hanja ', isSunday() ? h('span', { class: 'badge' }, 'New today!') : ''),
         hanjaList(hanjaForWeek(wi)),
-        ankiButtons('hanja', [wi], 'hanja'))),
+        ankiButtons([wi], 'hanja'))),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Quick drills'),

@@ -9,7 +9,8 @@ const DEFAULTS = () => ({
   startDate: todayStr(),
   daily: {}, // date -> { questions, results, done }
   streak: { last: null, count: 0 },
-  anki: { words: {}, hanja: {} }, // dayIndex/weekIndex -> true when sent
+  anki: { words: {}, hanja: {} }, // weekIndex -> true when hanja sent (words: old day-index scheme, kept for migration)
+  vocab: null, // daily words: { words: { ko: { s: studying|known|skip, d: date, anki } }, set: { date, list } } — see vocab-plan.js
   best: {}, // drill key -> best score
   myWords: {}, // ko -> { en, added: date, ok: correct answers in a row } — words saved from questions for review
   settings: {
@@ -38,6 +39,8 @@ function load() {
 }
 
 export const state = load();
+// persist right away so the start date (and so the day count) sticks even before the first answer
+try { if (!localStorage.getItem(KEY)) save(); } catch { /* storage blocked */ }
 
 export function save() {
   try {
