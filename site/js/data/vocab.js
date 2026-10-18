@@ -408,7 +408,7 @@ const RAW_HANJA = `
 大|큰 대|big|대학 大學 university; 대통령 大統領 president
 小|작을 소|small|소설 小說 novel; 소아과 小兒科 pediatrics
 中|가운데 중|middle|중국 中國 China; 중학교 中學校 middle school
-學|배울 학|learn|학생 學生 student; 학교 學校 school
+學|배울 학|study; learn|학생 學生 student; 학교 學校 school
 生|날 생|life; birth|생일 生日 birthday; 학생 學生 student
 先|먼저 선|first; ahead|선생님 先生님 teacher; 우선 于先 first of all
 年|해 년|year|내년 來年 next year; 매년 每年 every year
@@ -530,8 +530,18 @@ const RAW_HANJA = `
 用|쓸 용|use|사용 使用 use; 비용 費用 cost
 `;
 
+/** "천 원 千 원 1,000 won" → { ko: '천 원', hj: '千 원', en: '1,000 won' } (the hanja spelling has as many words as the Korean) */
+function parseExample(s) {
+  const t = s.trim().split(' ');
+  const at = t.findIndex((x) => /[一-鿿]/.test(x));
+  return { ko: t.slice(0, at).join(' '), hj: t.slice(at, at * 2).join(' '), en: t.slice(at * 2).join(' ') };
+}
+
+/**
+ * { h: the character (only used for word breakdowns, never shown), syl: its Korean syllable (학),
+ *   hun: native gloss + syllable (배울 학), en: meaning, words: [{ ko, hj, en }] }
+ */
 export const HANJA = RAW_HANJA.trim().split('\n').map((line) => {
   const [h, hun, en, ex] = line.split('|');
-  const examples = ex.split(';').map((s) => s.trim());
-  return { h, hun, en, ex: examples };
+  return { h, syl: hun.split(' ').pop(), hun, en, words: ex.split(';').map(parseExample) };
 });

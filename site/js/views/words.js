@@ -1,7 +1,8 @@
 import { h, toast } from '../dom.js';
-import { state, save, removeWord, wordsToReview, KNOWN_AFTER } from '../state.js';
+import { state, save, saveWord, removeWord, wordsToReview, KNOWN_AFTER } from '../state.js';
 import { todayStr, daysBetween, makeRng } from '../rng.js';
 import { HANJA } from '../data/vocab.js';
+import { partsOf } from '../data/hanja-gloss.js';
 import { speakButton } from '../tts.js';
 import { addCards, downloadAnkiFile, hanjaCard, wordCard } from '../anki.js';
 import { runQuiz } from '../quiz.js';
@@ -31,12 +32,43 @@ export function hanjaForWeek(i) {
 
 export const isSunday = () => new Date().getDay() === 0;
 
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const meaningOf = (x) => x.en.split(';').map((m) => cap(m.trim())).join(', ');
+
+/** "Study + period = Semester", with this week's syllable in bold. */
+function breakdown(x, w) {
+  const parts = partsOf(w.ko, w.hj);
+  return h('span', { class: 'hanja-break' },
+    ...parts.flatMap((p, i) => [i ? ' + ' : '', p.ch === x.h ? h('b', {}, cap(p.gloss)) : cap(p.gloss)]),
+    ' = ', cap(w.en));
+}
+
+/** Sino-Korean syllables: the syllable, what it means, and sample words you can tap to save for review. */
 export function hanjaList(list) {
+  const wordBtn = (w) => {
+    const b = h('button', { type: 'button', class: 'hanja-word ko' });
+    const paint = () => {
+      const saved = !!state.myWords[w.ko];
+      b.replaceChildren(w.ko, h('span', { class: 'hanja-word-state' }, saved ? '✓ studying' : '+ study'));
+      b.classList.toggle('saved', saved);
+      b.title = saved ? 'In your saved words. Click to remove.' : 'Save to your words for review';
+    };
+    b.addEventListener('click', () => {
+      if (state.myWords[w.ko]) removeWord(w.ko);
+      else { saveWord(w.ko, w.en); toast(`Saved ${w.ko} to your words for review.`, 'good'); }
+      paint();
+    });
+    paint();
+    return b;
+  };
   return h('div', { class: 'hanja-grid' }, ...list.map((x) => h('div', { class: 'hanja-card' },
-    h('div', { class: 'hanja' }, x.h),
-    h('div', { class: 'ko' }, x.hun, ' ', speakButton(x.hun)),
-    h('div', { class: 'en small' }, x.en),
-    h('ul', { class: 'small hanja-ex' }, ...x.ex.map((e) => h('li', {}, e))))));
+    h('div', { class: 'hanja-head' },
+      h('span', { class: 'hanja-syl ko' }, x.syl), speakButton(x.syl),
+      h('span', { class: 'hanja-mean' }, '– ', meaningOf(x))),
+    h('div', { class: 'muted small hanja-sub' }, 'Sample words (click to study)'),
+    h('ul', { class: 'hanja-words' }, ...x.words.map((w) => h('li', {},
+      h('div', { class: 'hanja-word-row' }, wordBtn(w), speakButton(w.ko)),
+      h('div', { class: 'small muted' }, breakdown(x, w))))))));
 }
 
 const dailyCard = (w) => wordCard(w, ['daily-word', `added-${todayStr()}`]);

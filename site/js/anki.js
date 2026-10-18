@@ -1,5 +1,6 @@
 // Anki integration via the AnkiConnect add-on, with a downloadable import file as fallback.
 import { state } from './state.js';
+import { partsOf } from './data/hanja-gloss.js';
 
 async function invoke(action, params = {}) {
   // A plain string body keeps this a "simple" CORS request (no preflight).
@@ -113,8 +114,15 @@ export function downloadAnkiFile(filename, deck, cards) {
 /** A vocab card: Korean word + English meaning (front/back are used with a custom note type). */
 export const wordCard = (w, tags = []) => ({ ko: w.ko, en: w.en || '?', front: w.ko, back: w.en || '?', tags });
 
-export const hanjaCard = (h, week) => ({
-  front: h.h,
-  back: `<b>${h.hun}</b> — ${h.en}<br><br>${h.ex.join('<br>')}`,
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * Hanja syllable card, no Chinese characters: the front shows the syllable in its two sample words (which also keeps
+ * fronts unique, since 화 can be fire, talk, change or flower); the back gives the meaning and the word breakdowns.
+ */
+export const hanjaCard = (x, week) => ({
+  front: `<b>${x.syl}</b><br>${x.words.map((w) => w.ko).join(' · ')}`,
+  back: `<b>${x.syl}</b> = ${x.en.split(';').map((m) => cap(m.trim())).join(', ')}<br><br>`
+    + x.words.map((w) => `${w.ko}: ${partsOf(w.ko, w.hj).map((p) => (p.ch === x.h ? `<b>${cap(p.gloss)}</b>` : cap(p.gloss))).join(' + ')} = ${cap(w.en)}`).join('<br>'),
   tags: [`hanja-week-${week + 1}`],
 });
