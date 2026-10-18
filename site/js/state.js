@@ -23,7 +23,8 @@ const DEFAULTS = () => ({
     ankiUrl: 'http://127.0.0.1:8765',
     deckWords: 'Korean::Daily words',
     deckHanja: 'Korean::Hanja',
-    noteType: 'Basic (and reversed card)',
+    wordCards: 'enko', // enko | both | custom — see WORD_CARD_STYLES in anki.js
+    noteType: 'Basic (and reversed card)', // hanja cards, and word cards when wordCards is 'custom'
   },
 });
 

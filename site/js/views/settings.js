@@ -1,7 +1,7 @@
 import { h, toast } from '../dom.js';
 import { state, save, exportState, importState, resetState } from '../state.js';
 import { koreanVoices, speak, ttsSupported } from '../tts.js';
-import { ankiVersion } from '../anki.js';
+import { ankiVersion, setUpNoteTypes, WORD_CARD_STYLES, CARD_TEMPLATES } from '../anki.js';
 import { todayStr } from '../rng.js';
 import { getApiKey, setApiKey, testApiKey } from '../ai.js';
 
@@ -24,6 +24,8 @@ export function renderSettings(main) {
 
   const rate = bind(h('input', { type: 'range', min: '0.5', max: '1.4', step: '0.05', value: s.ttsRate }), 'ttsRate', Number);
   const ankiStatus = h('span', { class: 'small muted' });
+  const wordCardSelect = bind(h('select', {}, ...Object.entries(WORD_CARD_STYLES).map(([k, st]) => h('option', { value: k, selected: (s.wordCards || 'enko') === k }, st.label))), 'wordCards');
+  const tpl = (t) => `Front template:\n${t.Front}\n\nBack template:\n${t.Back}`;
 
   const keyInput = h('input', { type: 'password', value: getApiKey(), placeholder: 'AIza…', autocomplete: 'off', spellcheck: 'false' });
   const keyStatus = h('span', { class: 'small muted' }, getApiKey() ? 'Key saved in this browser.' : '');
@@ -90,8 +92,24 @@ export function renderSettings(main) {
       field('AnkiConnect URL', bind(h('input', { type: 'url', value: s.ankiUrl }), 'ankiUrl')),
       field('Deck for daily words', bind(h('input', { type: 'text', value: s.deckWords }), 'deckWords')),
       field('Deck for hanja', bind(h('input', { type: 'text', value: s.deckHanja }), 'deckHanja')),
-      field('Note type', bind(h('input', { type: 'text', value: s.noteType }), 'noteType'), 'Must exist in Anki and have Front and Back fields, e.g. "Basic" or "Basic (and reversed card)".'),
+      field('Word cards', wordCardSelect, 'Applies to new words and your saved words. The note type is created in Anki for you the first time you click "Add to Anki".'),
+      field('Note type for hanja (and "My own note type" word cards)', bind(h('input', { type: 'text', value: s.noteType }), 'noteType'), 'Must exist in Anki and have Front and Back fields, e.g. "Basic" or "Basic (and reversed card)".'),
+      h('details', { class: 'small top-gap' },
+        h('summary', {}, 'Word card templates'),
+        h('p', { class: 'muted' }, `Using "Download for Anki" instead of AnkiConnect? Click "Set up note types in Anki" once, or create note types named "${WORD_CARD_STYLES.enko.model}" and "${WORD_CARD_STYLES.both.model}" yourself, with fields Korean and English (in that order):`),
+        h('pre', { class: 'code' }, [
+          `── ${CARD_TEMPLATES.enko.Name} ──`, tpl(CARD_TEMPLATES.enko), '',
+          `── ${CARD_TEMPLATES.koen.Name} (both ways only) ──`, tpl(CARD_TEMPLATES.koen), '',
+          '── Styling ──', CARD_TEMPLATES.css,
+        ].join('\n'))),
       h('div', { class: 'row-actions' },
+        h('button', {
+          class: 'btn',
+          onclick: async () => {
+            ankiStatus.textContent = 'Setting up…';
+            try { await setUpNoteTypes(); ankiStatus.textContent = '✓ Note types are in Anki'; } catch (e) { ankiStatus.textContent = `✗ ${/fetch/i.test(e.message) ? 'Not reachable. Is Anki open, and is this site in webCorsOriginList?' : e.message}`; }
+          },
+        }, 'Set up note types in Anki'),
         h('button', {
           class: 'btn',
           onclick: async () => {

@@ -3,7 +3,7 @@ import { state, save, removeWord, wordsToReview, KNOWN_AFTER } from '../state.js
 import { todayStr, daysBetween, makeRng } from '../rng.js';
 import { HANJA } from '../data/vocab.js';
 import { speakButton } from '../tts.js';
-import { addCards, downloadAnkiFile, hanjaCard } from '../anki.js';
+import { addCards, downloadAnkiFile, hanjaCard, wordCard } from '../anki.js';
 import { runQuiz } from '../quiz.js';
 import { currentSet, setStatus, restore, setSentToAnki, markSent, upcoming, wordsWith, STATUS } from '../vocab-plan.js';
 
@@ -39,7 +39,7 @@ export function hanjaList(list) {
     h('ul', { class: 'small hanja-ex' }, ...x.ex.map((e) => h('li', {}, e))))));
 }
 
-const wordCard = (w) => ({ front: w.ko, back: w.en, tags: ['daily-word', `added-${todayStr()}`] });
+const dailyCard = (w) => wordCard(w, ['daily-word', `added-${todayStr()}`]);
 const ANKI_DOWN = 'Could not reach Anki. Is Anki open with AnkiConnect installed? See Settings → Anki. You can download the file instead.';
 
 /** Send cards; returns true when Anki took them. */
@@ -87,19 +87,19 @@ export function todaysWordsCard(onChange) {
 
   const send = h('button', { class: 'btn primary small' }, 'Add to Anki → new words');
   send.addEventListener('click', async () => {
-    if (!(await sendCards(state.settings.deckWords, set.map(wordCard), send))) return;
+    if (!(await sendCards(state.settings.deckWords, set.map(dailyCard), send))) return;
     setSentToAnki();
     onChange();
   });
   const dl = h('button', { class: 'btn small', title: 'Download a file for Anki → File → Import, then get new words' }, 'Download for Anki → new words');
   dl.addEventListener('click', () => {
-    downloadAnkiFile(`korean-words-${todayStr()}.txt`, state.settings.deckWords, set.map(wordCard));
+    downloadAnkiFile(`korean-words-${todayStr()}.txt`, state.settings.deckWords, set.map(dailyCard));
     setSentToAnki();
     onChange();
   });
   const sendOld = h('button', { class: 'btn ghost small' }, 'Send them too');
   sendOld.addEventListener('click', async () => {
-    if (!(await sendCards(state.settings.deckWords, unsent.map(wordCard), sendOld))) return;
+    if (!(await sendCards(state.settings.deckWords, unsent.map(dailyCard), sendOld))) return;
     markSent(unsent.map((w) => w.ko));
     onChange();
   });
@@ -170,7 +170,7 @@ export function savedWordQuestion(w) {
 function savedSection(main) {
   const all = Object.entries(state.myWords).map(([ko, w]) => ({ ko, ...w })).sort((a, b) => b.added.localeCompare(a.added));
   const area = h('div');
-  const cards = () => all.map((w) => ({ front: w.ko, back: w.en || '?', tags: ['saved-word'] }));
+  const cards = () => all.map((w) => wordCard(w, ['saved-word']));
 
   function practice() {
     const r = makeRng();
