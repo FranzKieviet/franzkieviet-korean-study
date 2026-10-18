@@ -3,7 +3,7 @@
 //   known / skip: you removed it (already know it / not useful to you) — never suggested again
 // The current set refills from the upcoming words (in order of usefulness) whenever you remove one, and is
 // replaced by a fresh set only when you add it to Anki — never by the calendar, so a break doesn't pile up words.
-import { state, save } from './state.js';
+import { state, save, addPoint } from './state.js';
 import { WORDS } from './data/vocab.js';
 import { todayStr, daysBetween } from './rng.js';
 
@@ -78,7 +78,7 @@ export function setSentToAnki() {
   for (const ko of v.set.list) v.words[ko] = { s: 'studying', d: todayStr(), anki: true };
   v.set.list = [];
   currentSet();
-  save();
+  addPoint('vocab');
 }
 
 export function markSent(kos) {

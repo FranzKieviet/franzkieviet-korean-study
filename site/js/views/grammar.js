@@ -1,5 +1,5 @@
 import { h } from '../dom.js';
-import { state, save, recordResult, overrideResult, accuracy } from '../state.js';
+import { state, save, recordResult, overrideResult, accuracy, addPoint } from '../state.js';
 import { makeRng } from '../rng.js';
 import { BOOKS, LESSONS, ALL_TOPICS } from '../data/grammar.js';
 import { grammarQuestions } from '../practice.js';
@@ -17,6 +17,7 @@ function practice(main, ctx, topicIds, count, title) {
     title,
     onAnswer: (q, ok, given, i, override) => (override ? overrideResult(q.topicId) : recordResult(q.topicId, ok)),
     onRetryAnswer: () => {},
+    onDone: () => addPoint('grammar'),
     onExit: () => renderGrammar(main, ctx),
   });
 }

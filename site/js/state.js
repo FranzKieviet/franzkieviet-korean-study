@@ -12,6 +12,7 @@ const DEFAULTS = () => ({
   anki: { words: {}, hanja: {} }, // weekIndex -> true when hanja sent (words: old day-index scheme, kept for migration)
   vocab: null, // daily words: { words: { ko: { s: studying|known|skip, d: date, anki } }, set: { date, list } } — see vocab-plan.js
   best: {}, // drill key -> best score
+  activity: null, // { grammar: { date: points }, vocab: { date: points } } — the progress grids on Today
   myWords: {}, // ko -> { en, added: date, ok: correct answers in a row } — words saved from questions for review
   settings: {
     dailyCount: 15,
@@ -103,6 +104,29 @@ export function accuracy(topicId) {
   if (!s || s.c + s.w === 0) return null;
   return s.c / (s.c + s.w);
 }
+
+/** Points per day for the progress grids: 1 per finished grammar session, 1 per vocab set added to Anki. */
+function activity() {
+  if (!state.activity) {
+    // first run: fill in from history (finished daily reviews, words already sent to Anki, 5 per set)
+    const a = { grammar: {}, vocab: {} };
+    for (const [d, x] of Object.entries(state.daily)) if (x.done) a.grammar[d] = 1;
+    const sent = {};
+    for (const w of Object.values(state.vocab?.words || {})) if (w.anki && w.s === 'studying') sent[w.d] = (sent[w.d] || 0) + 1;
+    for (const [d, n] of Object.entries(sent)) a.vocab[d] = Math.ceil(n / 5);
+    state.activity = a;
+  }
+  return state.activity;
+}
+
+export function addPoint(kind) {
+  const log = activity()[kind];
+  const d = todayStr();
+  log[d] = (log[d] || 0) + 1;
+  save();
+}
+
+export const pointsLog = (kind) => activity()[kind];
 
 export function markDailyDone() {
   const today = todayStr();

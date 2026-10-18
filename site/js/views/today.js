@@ -1,11 +1,12 @@
 import { h, toast } from '../dom.js';
-import { state, save, recordResult, overrideResult, markDailyDone, currentStreak, accuracy, wordsToReview } from '../state.js';
+import { state, save, recordResult, overrideResult, markDailyDone, currentStreak, accuracy, wordsToReview, addPoint, pointsLog } from '../state.js';
 import { makeRng, todayStr } from '../rng.js';
 import { grammarQuestions, pickTopics, verbQuestion, numberQuestion, learnedForms } from '../practice.js';
 import { aiEnabled, aiGrammarQuestions } from '../ai.js';
 import { ALL_VERBS } from '../data/words.js';
 import { topicById, makeQuestion } from '../data/grammar.js';
 import { runQuiz } from '../quiz.js';
+import { heatmapCard } from './heatmap.js';
 import { weekIndex, hanjaForWeek, hanjaList, ankiButtons, isSunday, savedWordQuestion, todaysWordsCard } from './words.js';
 
 const DAILY_NUM_CATS = ['sinoSmall', 'sinoBig', 'native', 'counters', 'money', 'time', 'dates', 'days', 'months', 'age', 'phone'];
@@ -95,6 +96,7 @@ export function renderToday(main, ctx) {
         daily.done = true;
         save();
         markDailyDone();
+        addPoint('grammar');
       },
       allowRetry: true,
       onExit: () => renderToday(main, ctx),
@@ -138,6 +140,10 @@ export function renderToday(main, ctx) {
           ? h('button', { class: 'btn', onclick: regenerate }, 'Do another round')
           : h('button', { class: 'btn primary big', onclick: startDaily }, answered ? `Continue (${answered}/${total})` : 'Start today’s review'),
         learnedChanged ? h('button', { class: 'btn ghost small', onclick: regenerate, title: 'You changed your learned topics' }, 'Rebuild with my new topics') : '')),
+
+    h('div', { class: 'grid-2' },
+      heatmapCard('Grammar practice', pointsLog('grammar'), ['session', 'sessions'], 'A point for every finished daily review or grammar practice.'),
+      heatmapCard('Vocab sets', pointsLog('vocab'), ['set', 'sets'], 'A point for every word set you add to Anki.')),
 
     h('div', { class: 'grid-2' },
       todaysWordsCard(() => renderToday(main, ctx)),

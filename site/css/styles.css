@@ -276,3 +276,28 @@ th, td { text-align: left; padding: .3rem .4rem; border-bottom: 1px solid var(--
 button.chip-check { font: inherit; font-size: .9rem; color: var(--text); }
 .browse-search { width: 100%; margin: .75rem 0 .25rem; font: inherit; padding: .5rem .7rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }
 .browse-list { max-height: 28rem; overflow-y: auto; }
+
+/* Progress grids (GitHub style): one hue, light → dark; empty days are the quiet surface tone */
+.heat-card h2 { margin-bottom: .15rem; }
+.heat-sum { margin: 0 0 .7rem; }
+.heat { display: grid; grid-template-columns: auto 1fr; gap: .35rem; }
+.heat-days { display: grid; grid-template-rows: 1.1em repeat(7, 1fr); gap: 3px; font-size: .68rem; line-height: 1; }
+.heat-days span { display: flex; align-items: center; }
+.heat-main { min-width: 0; }
+.heat-months { display: grid; grid-template-columns: repeat(var(--weeks), 1fr); gap: 3px; height: 1.1em; font-size: .68rem; line-height: 1; }
+.heat-month { white-space: nowrap; }
+.heat-grid { display: grid; grid-template-columns: repeat(var(--weeks), 1fr); grid-template-rows: repeat(7, auto); grid-auto-flow: column; gap: 3px; }
+.heat-cell { aspect-ratio: 1; border-radius: 2px; background: var(--surface-2); outline: 1px solid color-mix(in srgb, var(--text) 6%, transparent); outline-offset: -1px; }
+.heat-cell.l1 { background: color-mix(in srgb, var(--accent) 30%, var(--surface)); }
+.heat-cell.l2 { background: color-mix(in srgb, var(--accent) 55%, var(--surface)); }
+.heat-cell.l3 { background: color-mix(in srgb, var(--accent) 78%, var(--surface)); }
+.heat-cell.l4 { background: var(--accent); }
+.heat-cell.future { background: transparent; outline: none; }
+.heat-cell.today { outline: 1.5px solid var(--text); outline-offset: 0; }
+.heat-grid .heat-cell:not(.future):hover { outline: 1.5px solid var(--text); outline-offset: 0; }
+.heat-foot { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; margin-top: .6rem; }
+.heat-caption { min-height: 1.2em; }
+.heat-legend { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; }
+.heat-legend .heat-cell { width: 10px; }
+.heat-legend .heat-cell:first-of-type { margin-left: .25rem; }
+.heat-legend .heat-cell:last-of-type { margin-right: .25rem; }
