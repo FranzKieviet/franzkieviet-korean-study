@@ -1,0 +1,8 @@
+# franzkieviet.com/korean is proxied through the personalwebsite Amplify app, whose CDN only clears on ITS deploys.
+# Amplify's default (s-maxage=31536000) made it serve a year-old mix of old and new JS modules after every
+# korean-study deploy, so keep CDN copies for at most a minute.
+customHeaders:
+  - pattern: '**/*'
+    headers:
+      - key: Cache-Control
+        value: 'public, max-age=0, s-maxage=60'
