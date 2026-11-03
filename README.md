@@ -31,7 +31,9 @@ npm test           # checks the conjugation engine and every question generator
 
 Install [AnkiConnect](https://ankiweb.net/shared/info/2055492159) (code `2055492159`). In Anki → Tools → Add-ons → AnkiConnect → Config, add your Amplify URL (and `http://localhost:5173` for local use) to `webCorsOriginList`, then restart Anki. Keep Anki open when you click "Add to Anki". Duplicates are skipped.
 
-If the browser can't reach Anki (Safari blocks it, for example), use **Download for Anki** and import the file with File → Import. Deck names and note type are under Settings.
+If the browser can't reach Anki (Safari blocks it, for example), use **Download for Anki** and open the `.apkg` file. Deck names and note type are under Settings.
+
+On a phone or tablet there's no AnkiConnect, so **Add to Anki** builds an `.apkg` file in the browser (`site/js/apkg.js`, using sql.js from cdnjs) and opens the share sheet: pick Anki (AnkiMobile or AnkiDroid). The file brings its own deck and note types, and note IDs come from the word, so importing a word again doesn't duplicate it.
 
 ## Data
 

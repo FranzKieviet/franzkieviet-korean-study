@@ -4,9 +4,9 @@ import { todayStr, daysBetween, makeRng } from '../rng.js';
 import { HANJA } from '../data/vocab.js';
 import { partsOf } from '../data/hanja-gloss.js';
 import { speakButton } from '../tts.js';
-import { addCards, downloadAnkiFile, hanjaCard, wordCard } from '../anki.js';
+import { addCards, ankiFile, giveAnkiFile, isMobile, prepareAnkiFile, hanjaCard, wordCard } from '../anki.js';
 import { runQuiz } from '../quiz.js';
-import { currentSet, setStatus, restore, setSentToAnki, markSent, upcoming, wordsWith, STATUS } from '../vocab-plan.js';
+import { currentSet, setStatus, restore, setSentToAnki, markSent, upcoming, wordsWith, wordInfo, STATUS } from '../vocab-plan.js';
 
 export function dayIndex() {
   return Math.max(0, daysBetween(state.startDate, todayStr()));
@@ -74,7 +74,7 @@ export function hanjaList(list) {
 const dailyCard = (w) => wordCard(w, ['daily-word', `added-${todayStr()}`]);
 const ANKI_DOWN = 'Could not reach Anki. Is Anki open with AnkiConnect installed? See Settings → Anki. You can download the file instead.';
 
-/** Send cards; returns true when Anki took them. */
+/** Send cards with AnkiConnect; returns true when Anki took them. */
 async function sendCards(deck, cards, btn) {
   btn.disabled = true;
   const old = btn.textContent;
@@ -86,26 +86,67 @@ async function sendCards(deck, cards, btn) {
   } catch (e) {
     console.warn(e);
     toast(ANKI_DOWN, 'bad');
+    return false;
+  } finally {
     btn.textContent = old;
     btn.disabled = false;
-    return false;
   }
+}
+
+/**
+ * Make an .apkg file and share it (phones: pick Anki in the share sheet) or download it (computers).
+ * Returns true once it went out. If iOS wants a fresh tap before sharing, the button keeps the file for the next tap.
+ */
+async function sendFile(deck, cards, btn, name) {
+  btn.disabled = true;
+  const old = btn.dataset.label ||= btn.textContent;
+  btn.textContent = 'Preparing…';
+  try {
+    btn.file ||= await ankiFile(`${name}-${todayStr()}.apkg`, deck, cards);
+    const ok = await giveAnkiFile(btn.file);
+    btn.file = null;
+    btn.textContent = old;
+    if (ok && !isMobile) toast('Downloaded. Open the file to add the cards to Anki.', 'good');
+    return ok;
+  } catch (e) {
+    if (e.name === 'NotAllowedError') {
+      btn.textContent = 'Ready: tap to open in Anki';
+      return false;
+    }
+    console.warn(e);
+    btn.file = null;
+    btn.textContent = old;
+    toast(e.message || 'Could not make the Anki file.', 'bad');
+    return false;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/** Add cards to Anki: AnkiConnect on a computer, an .apkg file on a phone. */
+const toAnki = (deck, cards, btn, name) => (isMobile ? sendFile(deck, cards, btn, name) : sendCards(deck, cards, btn));
+
+/** "Download for Anki" (computers only: on a phone the main button already gives you the file). */
+function downloadButton(deck, cards, name, onSent = () => {}) {
+  if (isMobile) return '';
+  const dl = h('button', { class: 'btn small', title: 'Download an Anki file (.apkg), then open it to import' }, 'Download for Anki');
+  dl.addEventListener('click', async () => { if (await sendFile(deck, cards(), dl, name)) onSent(); });
+  return dl;
 }
 
 /** Hanja: one set per week. */
 export function ankiButtons(indexes, label) {
+  if (isMobile) prepareAnkiFile();
   const sent = indexes.every((i) => state.anki.hanja[i]);
   const send = h('button', { class: 'btn primary small' }, sent ? '✓ In Anki' : `Add ${label} to Anki`);
   const cards = () => indexes.flatMap((i) => hanjaForWeek(i).map((x) => hanjaCard(x, i)));
   send.addEventListener('click', async () => {
-    if (!(await sendCards(state.settings.deckHanja, cards(), send))) return;
+    if (!(await toAnki(state.settings.deckHanja, cards(), send, 'korean-hanja'))) return;
     indexes.forEach((i) => (state.anki.hanja[i] = true));
     save();
     send.textContent = '✓ In Anki';
   });
-  const dl = h('button', { class: 'btn small', title: 'Download a file for Anki → File → Import' }, 'Download for Anki');
-  dl.addEventListener('click', () => downloadAnkiFile(`korean-hanja-${todayStr()}.txt`, state.settings.deckHanja, cards()));
-  return h('div', { class: 'row-actions' }, send, dl);
+  return h('div', { class: 'row-actions' }, send, downloadButton(state.settings.deckHanja, cards, 'korean-hanja'));
 }
 
 /**
@@ -117,21 +158,17 @@ export function todaysWordsCard(onChange) {
   const unsent = wordsWith('studying').filter((w) => !w.anki);
   const remove = (ko, s) => { setStatus(ko, s); onChange(); };
 
+  if (isMobile) prepareAnkiFile();
+  const sent = () => { setSentToAnki(); onChange(); };
   const send = h('button', { class: 'btn primary small' }, 'Add to Anki → new words');
   send.addEventListener('click', async () => {
-    if (!(await sendCards(state.settings.deckWords, set.map(dailyCard), send))) return;
-    setSentToAnki();
-    onChange();
+    if (await toAnki(state.settings.deckWords, set.map(dailyCard), send, 'korean-words')) sent();
   });
-  const dl = h('button', { class: 'btn small', title: 'Download a file for Anki → File → Import, then get new words' }, 'Download for Anki → new words');
-  dl.addEventListener('click', () => {
-    downloadAnkiFile(`korean-words-${todayStr()}.txt`, state.settings.deckWords, set.map(dailyCard));
-    setSentToAnki();
-    onChange();
-  });
+  const dl = downloadButton(state.settings.deckWords, () => set.map(dailyCard), 'korean-words', sent);
+  if (dl) dl.textContent = dl.dataset.label = 'Download for Anki → new words';
   const sendOld = h('button', { class: 'btn ghost small' }, 'Send them too');
   sendOld.addEventListener('click', async () => {
-    if (!(await sendCards(state.settings.deckWords, unsent.map(dailyCard), sendOld))) return;
+    if (!(await toAnki(state.settings.deckWords, unsent.map(dailyCard), sendOld, 'korean-words'))) return;
     markSent(unsent.map((w) => w.ko));
     onChange();
   });
@@ -144,7 +181,8 @@ export function todaysWordsCard(onChange) {
         h('span', { class: 'spacer' }),
         h('span', { class: 'word-actions' },
           h('button', { class: 'btn ghost small', title: 'I already know this word', onclick: () => remove(w.ko, 'known') }, 'I know it'),
-          h('button', { class: 'btn ghost small', title: 'Not useful for me', onclick: () => remove(w.ko, 'skip') }, 'Skip')))))
+          h('button', { class: 'btn ghost small', title: 'Not useful for me', onclick: () => remove(w.ko, 'skip') }, 'Skip')),
+        w.note ? h('div', { class: 'word-note muted small' }, w.note) : '')))
       : h('p', { class: 'muted' }, 'You have gone through every word in the list. 대단해요!'),
     set.length ? h('p', { class: 'muted small' }, 'Remove words you know or don’t need and a new one takes their place. You get a fresh set when you add these to Anki, so take breaks whenever you like: nothing piles up.') : '',
     set.length ? h('div', { class: 'row-actions' }, send, dl) : '',
@@ -195,8 +233,8 @@ function browseSection(main) {
 /** A quiz question for a word saved from a question (no meaning saved → say-it flashcard). */
 export function savedWordQuestion(w) {
   return w.en
-    ? { q: '', cue: `In Korean: ${w.en}`, a: [w.ko], speak: w.ko, topicTitle: 'My words', savedWord: w.ko, noTap: true }
-    : { q: w.ko, cue: 'Do you remember what it means? Say it, then reveal.', a: [w.ko], speak: w.ko, self: true, topicTitle: 'My words', savedWord: w.ko };
+    ? { q: '', cue: `In Korean: ${w.en}`, a: [w.ko], speak: w.ko, topicTitle: 'My words', savedWord: w.ko, noTap: true, vocab: true, note: wordInfo(w.ko).note }
+    : { q: w.ko, cue: 'Do you remember what it means? Say it, then reveal.', a: [w.ko], speak: w.ko, self: true, topicTitle: 'My words', savedWord: w.ko, note: wordInfo(w.ko).note };
 }
 
 function savedSection(main) {
@@ -212,16 +250,6 @@ function savedSection(main) {
     area.scrollIntoView({ behavior: 'smooth' });
   }
 
-  async function send(btn) {
-    btn.disabled = true;
-    try {
-      const { added, skipped } = await addCards(state.settings.deckWords, cards());
-      toast(`Added ${added} card${added === 1 ? '' : 's'} to "${state.settings.deckWords}"${skipped ? ` (${skipped} already there)` : ''}.`, 'good');
-    } catch {
-      toast('Could not reach Anki. Is Anki open with AnkiConnect installed? See Settings → Anki. You can download the file instead.', 'bad');
-    }
-    btn.disabled = false;
-  }
 
   return h('section', { class: 'card', id: 'my-words' },
     h('h2', {}, 'My saved words ', all.length ? h('span', { class: 'pill' }, String(all.length)) : ''),
@@ -235,8 +263,8 @@ function savedSection(main) {
       h('button', { class: 'btn ghost small', title: 'Remove', 'aria-label': `Remove ${w.ko}`, onclick: () => { removeWord(w.ko); renderWords(main); } }, '✕')))) : '',
     all.length ? h('div', { class: 'row-actions top-gap' },
       h('button', { class: 'btn primary', onclick: practice }, 'Practice saved words'),
-      h('button', { class: 'btn small', onclick: (e) => send(e.currentTarget) }, 'Add to Anki'),
-      h('button', { class: 'btn small', onclick: () => downloadAnkiFile(`korean-saved-words-${todayStr()}.txt`, state.settings.deckWords, cards()) }, 'Download for Anki')) : '',
+      h('button', { class: 'btn small', onclick: (e) => toAnki(state.settings.deckWords, cards(), e.currentTarget, 'korean-saved-words') }, 'Add to Anki'),
+      downloadButton(state.settings.deckWords, cards, 'korean-saved-words')) : '',
     area);
 }
 
@@ -251,8 +279,8 @@ export function renderWords(main) {
     const r = makeRng();
     const pool = r.shuffle(studyWords).slice(0, 20);
     const questions = pool.map((w) => (mode === 'type'
-      ? { q: '', cue: `In Korean: ${w.en}`, a: [w.ko], speak: w.ko, topicTitle: 'Words', noTap: true }
-      : { q: w.ko, cue: 'What does it mean? Say it, then reveal.', a: [w.en], speak: w.ko, self: true, topicTitle: 'Words' }));
+      ? { q: '', cue: `In Korean: ${w.en}`, a: [w.ko], speak: w.ko, topicTitle: 'Words', noTap: true, vocab: true, note: w.note }
+      : { q: w.ko, cue: 'What does it mean? Say it, then reveal.', a: [w.en], speak: w.ko, self: true, topicTitle: 'Words', note: w.note }));
     runQuiz(quizArea, { questions, onExit: () => renderWords(main) });
     quizArea.scrollIntoView({ behavior: 'smooth' });
   }
@@ -260,7 +288,7 @@ export function renderWords(main) {
   const sendWeeks = h('button', { class: 'btn ghost small' }, 'Send all');
   sendWeeks.addEventListener('click', async () => {
     const cards = unsentWeeks.flatMap((i) => hanjaForWeek(i).map((x) => hanjaCard(x, i)));
-    if (!(await sendCards(state.settings.deckHanja, cards, sendWeeks))) return;
+    if (!(await toAnki(state.settings.deckHanja, cards, sendWeeks, 'korean-hanja'))) return;
     unsentWeeks.forEach((i) => (state.anki.hanja[i] = true));
     save();
     renderWords(main);

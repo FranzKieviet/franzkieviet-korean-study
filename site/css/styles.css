@@ -310,3 +310,4 @@ button.chip-check { font: inherit; font-size: .9rem; color: var(--text); }
 .heat-legend .heat-cell { width: 10px; }
 .heat-legend .heat-cell:first-of-type { margin-left: .25rem; }
 .heat-legend .heat-cell:last-of-type { margin-right: .25rem; }
+.word-list li .word-note { grid-column: 1 / -1; margin: -.15rem 0 .1rem; line-height: 1.4; }

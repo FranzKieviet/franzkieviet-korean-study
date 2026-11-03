@@ -1,4 +1,6 @@
 // Daily vocabulary (5 per day, in order of everyday usefulness) and weekly hanja (5 per Sunday).
+import { RAW_MORE, NOTES } from './vocab-more.js';
+import { RAW_TOPIK } from './vocab-topik.js';
 
 const RAW_WORDS = `
 오늘|today
@@ -383,14 +385,16 @@ const RAW_WORDS = `
 방금|just now
 `;
 
+/** { ko, en, note? } — the first 380 words, a themed TOPIK I batch, then the rest of the TOPIK I list. Notes show with the answer. */
 export const WORDS = (() => {
   const seen = new Set();
   const out = [];
-  for (const line of RAW_WORDS.trim().split('\n')) {
-    const [ko, en] = line.split('|');
+  for (const line of [RAW_WORDS, RAW_MORE, RAW_TOPIK].map((r) => r.trim()).join('\n').split('\n')) {
+    const [ko, en, note] = line.split('|').map((s) => s?.trim());
     if (!ko || seen.has(ko)) continue;
     seen.add(ko);
-    out.push({ ko: ko.trim(), en: en.trim() });
+    const n = note || NOTES[ko];
+    out.push(n ? { ko, en, note: n } : { ko, en });
   }
   return out;
 })();

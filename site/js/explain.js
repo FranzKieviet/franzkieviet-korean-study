@@ -125,11 +125,20 @@ export function explainLocal(q, givenRaw) {
   const right = [];
   if (q.note) right.push(q.note);
   if (topic) right.push(`The rule (${topic.title}): ${topic.meaning}.`.replace(/\.\.$/, '.'));
-  else if (q.cue) right.push(`It's the form the cue asks for: ${q.cue}.`);
+  else if (q.cue && !q.vocab) right.push(`It's the form the cue asks for: ${q.cue}.`);
 
   const wrong = [];
   if (/[a-z]/i.test(givenRaw) && ![...givenRaw].some(isHangul) && !q.inputLang) {
     wrong.push('Your answer isn\'t in Hangul. Switch your keyboard to Korean and try again.');
+    return { wrong, right };
+  }
+
+  // vocab questions: it's either a spelling slip or a different word, grammar checks don't apply
+  if (q.vocab) {
+    const d = distance(jamo(norm(givenRaw)), jamo(norm(q.a[0])));
+    wrong.push(d && d <= 2
+      ? `Very close: it's a spelling slip. Compare ${givenRaw.trim()} with ${q.a[0]} letter by letter.`
+      : `${givenRaw.trim()} isn't the word for "${q.cue.replace(/^In Korean:\s*/, '')}".`);
     return { wrong, right };
   }
 

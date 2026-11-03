@@ -11,6 +11,8 @@ import { isCorrect } from '../site/js/quiz.js';
 import { numberQuestion, NUM_MODES } from '../site/js/practice.js';
 import { NUM_CATEGORIES } from '../site/js/numbers.js';
 import { acceptQuestions } from '../site/js/ai.js';
+import { WORDS, HANJA } from '../site/js/data/vocab.js';
+import { partsOf } from '../site/js/data/hanja-gloss.js';
 
 const cases = [
   ['먹다', 'present', '먹어요'], ['가다', 'past', '갔어요'], ['보다', 'present', '봐요'], ['마시다', 'past', '마셨어요'],
@@ -71,4 +73,12 @@ assert.equal(ai[0].topicTitle, 'NOUN이에요/예요');
 assert.equal(ai[1], null);
 assert.equal(ai[2], null);
 
-console.log(`ok: ${cases.length} conjugations, numbers, ${ALL_TOPICS.length} topics, ${n} generated questions`);
+// word bank: every line parsed into Korean + English, no stray separators
+for (const w of WORDS) {
+  assert.match(w.ko, /^[가-힣 ?]+$/, `word ${w.ko}`);
+  assert.ok(w.en && !w.en.includes('|'), `meaning of ${w.ko}`);
+}
+// hanja: every sample word breaks down into glossed parts
+for (const x of HANJA) for (const w of x.words) assert.ok(partsOf(w.ko, w.hj).every((p) => p.gloss), `hanja breakdown ${w.ko}`);
+
+console.log(`ok: ${cases.length} conjugations, numbers, ${ALL_TOPICS.length} topics, ${n} generated questions, ${WORDS.length} words, ${HANJA.length} hanja`);

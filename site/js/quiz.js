@@ -169,6 +169,7 @@ export function runQuiz(root, opts) {
       feedback.replaceChildren(
         h('div', { class: 'answer-line' }, h('span', { class: 'ko big' }, q.a[0]), speakButton(q.speak || sentence)),
         q.a.length > 1 ? h('div', { class: 'muted small' }, `Also: ${q.a.slice(1).join(' · ')}`) : '',
+        q.note ? h('div', { class: 'note' }, q.note) : '',
         h('div', { class: 'self-btns' },
           h('button', { class: 'btn good', onclick: () => record(true, '(said it)', true) }, '✓ I got it'),
           h('button', { class: 'btn bad', onclick: () => record(false, '(said it)', true) }, '✗ Missed it')),
