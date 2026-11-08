@@ -1,6 +1,5 @@
 // Anki integration via the AnkiConnect add-on (Anki desktop), or an .apkg file to open in any Anki app (phones).
 import { state } from './state.js';
-import { partsOf } from './data/hanja-gloss.js';
 import { buildApkg, loadSql } from './apkg.js';
 
 async function invoke(action, params = {}) {
@@ -46,7 +45,7 @@ export const WORD_CARD_STYLES = {
   both: { label: 'Both ways: English → type Korean, and Korean → English', model: 'Korean Study · English ⇄ Korean', id: 1761955200002, templates: [EN_KO, KO_EN] },
   custom: { label: 'My own note type (set below)' },
 };
-// .apkg files can't use your own note type (the file has to bring its note types along), so hanja and
+// .apkg files can't use your own note type (the file has to bring its note types along), so
 // "My own note type" word cards get a basic Front/Back one there.
 const BASIC = { model: 'Korean Study · Basic', id: 1761955200003, fields: ['Front', 'Back'],
   templates: [{ Name: 'Card 1', Front: '{{Front}}', Back: '{{FrontSide}}\n\n<hr id=answer>\n\n{{Back}}' }] };
@@ -156,16 +155,3 @@ export async function giveAnkiFile(file) {
 
 /** A vocab card: Korean word + English meaning (front/back are used with a custom note type). */
 export const wordCard = (w, tags = []) => ({ ko: w.ko, en: w.en || '?', front: w.ko, back: w.en || '?', tags });
-
-const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-
-/**
- * Hanja syllable card, no Chinese characters: the front shows the syllable in its two sample words (which also keeps
- * fronts unique, since 화 can be fire, talk, change or flower); the back gives the meaning and the word breakdowns.
- */
-export const hanjaCard = (x, week) => ({
-  front: `<b>${x.syl}</b><br>${x.words.map((w) => w.ko).join(' · ')}`,
-  back: `<b>${x.syl}</b> = ${x.en.split(';').map((m) => cap(m.trim())).join(', ')}<br><br>`
-    + x.words.map((w) => `${w.ko}: ${partsOf(w.ko, w.hj).map((p) => (p.ch === x.h ? `<b>${cap(p.gloss)}</b>` : cap(p.gloss))).join(' + ')} = ${cap(w.en)}`).join('<br>'),
-  tags: [`hanja-week-${week + 1}`],
-});

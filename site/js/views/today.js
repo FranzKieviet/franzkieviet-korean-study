@@ -7,7 +7,7 @@ import { ALL_VERBS } from '../data/words.js';
 import { topicById, makeQuestion } from '../data/grammar.js';
 import { runQuiz } from '../quiz.js';
 import { heatmapCard } from './heatmap.js';
-import { weekIndex, hanjaForWeek, hanjaList, ankiButtons, isSunday, savedWordQuestion, todaysWordsCard } from './words.js';
+import { savedWordQuestion, todaysWordsCard } from './words.js';
 
 const DAILY_NUM_CATS = ['sinoSmall', 'sinoBig', 'native', 'counters', 'money', 'time', 'dates', 'days', 'months', 'age', 'phone'];
 
@@ -108,7 +108,6 @@ export function renderToday(main, ctx) {
     if ((await build(btn)) && stillHere(btn)) renderToday(main, ctx);
   }
 
-  const wi = weekIndex();
   const answered = daily ? daily.results.length : 0;
   const total = daily ? daily.questions.length : (ids.length ? state.settings.dailyCount : 0) + 8 + Math.min(SAVED_PER_DAY, wordsToReview().length);
   const correct = daily ? daily.results.filter((r) => r.ok).length : 0;
@@ -145,12 +144,7 @@ export function renderToday(main, ctx) {
       heatmapCard('Grammar practice', pointsLog('grammar'), ['session', 'sessions'], 'A point for every finished daily review or grammar practice.'),
       heatmapCard('Vocab sets', pointsLog('vocab'), ['set', 'sets'], 'A point for every word set you add to Anki.')),
 
-    h('div', { class: 'grid-2' },
-      todaysWordsCard(() => renderToday(main, ctx)),
-      h('section', { class: 'card' },
-        h('h2', {}, 'This week’s hanja ', isSunday() ? h('span', { class: 'badge' }, 'New today!') : ''),
-        hanjaList(hanjaForWeek(wi)),
-        ankiButtons([wi], 'hanja'))),
+    todaysWordsCard(() => renderToday(main, ctx)),
 
     h('section', { class: 'card' },
       h('h2', {}, 'Quick drills'),

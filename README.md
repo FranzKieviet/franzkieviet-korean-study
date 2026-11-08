@@ -2,11 +2,11 @@
 
 A small static site for daily Korean practice:
 
-- **Today**: a daily review (seeded by date, so it stays the same all day) built from the grammar topics you've ticked, plus verb conjugations and numbers. It leans toward your weakest topics. It also shows a set of 5 new words (you get a fresh set each time you add one to Anki, so breaks never pile up words) and 5 new hanja every Sunday, with one-click "Add to Anki".
+- **Today**: a daily review (seeded by date, so it stays the same all day) built from the grammar topics you've ticked, plus verb conjugations and numbers. It leans toward your weakest topics. It also shows a set of 5 new words (you get a fresh set each time you add one to Anki, so breaks never pile up words), with one-click "Add to Anki".
 - **Grammar**: all 93 topics from *Anytime Korean Beginning 1 & 2* (Lessons 1–20). Tick what you've learned, read the explanations and examples (with audio), and practice by topic, by lesson or everything you've learned.
 - **Numbers**: Sino-Korean and native numbers, counters, age, money, time, dates, years, days of the week, months and phone numbers. Four modes: read, listen, Korean → number, and say it aloud. 60-second sprints with a best score.
 - **Verbs**: fast conjugation drills for 27 forms (present, past, honorific, -(으)ㄹ게요, -는데, modifiers, -습니다 …), including ㅂ/ㄷ/ㅅ/르/ㅎ/ㄹ/ㅡ irregulars, plus a conjugation table.
-- **Words**: today's words, this week's hanja, a review quiz, and Anki export.
+- **Words**: today's words, a review quiz, and Anki export.
 
 Answers are always typed, never multiple choice. Spacing and punctuation are ignored, and you can also type the whole sentence. "I was right" overrides the checker.
 
@@ -42,5 +42,5 @@ Progress is stored in your browser's localStorage. Use Settings → Export / Imp
 ## Adding content
 
 - Grammar topics and question generators: `site/js/data/grammar.js`
-- Daily words and hanja: `site/js/data/vocab.js` (380 words = 76 days; 131 hanja = 26 weeks. The lists loop after that, so add more any time.)
+- Daily words: `site/js/data/vocab.js`
 - Verbs and adjectives for drills: `site/js/data/words.js`

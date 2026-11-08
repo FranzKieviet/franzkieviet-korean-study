@@ -9,7 +9,7 @@ const DEFAULTS = () => ({
   startDate: todayStr(),
   daily: {}, // date -> { questions, results, done }
   streak: { last: null, count: 0 },
-  anki: { words: {}, hanja: {} }, // weekIndex -> true when hanja sent (words: old day-index scheme, kept for migration)
+  anki: { words: {}, hanja: {} }, // old schemes (words by day index, hanja by week), kept for migration
   vocab: null, // daily words: { words: { ko: { s: studying|known|skip, d: date, anki } }, set: { date, list } } — see vocab-plan.js
   best: {}, // drill key -> best score
   activity: null, // { grammar: { date: points }, vocab: { date: points } } — the progress grids on Today
@@ -22,9 +22,8 @@ const DEFAULTS = () => ({
     autoSpeak: true,
     ankiUrl: 'http://127.0.0.1:8765',
     deckWords: 'Korean::Daily words',
-    deckHanja: 'Korean::Hanja',
     wordCards: 'enko', // enko | both | custom — see WORD_CARD_STYLES in anki.js
-    noteType: 'Basic (and reversed card)', // hanja cards, and word cards when wordCards is 'custom'
+    noteType: 'Basic (and reversed card)', // word cards when wordCards is 'custom'
   },
 });
 

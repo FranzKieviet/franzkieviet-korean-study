@@ -1,75 +1,10 @@
 import { h, toast } from '../dom.js';
-import { state, save, saveWord, removeWord, wordsToReview, KNOWN_AFTER } from '../state.js';
-import { todayStr, daysBetween, makeRng } from '../rng.js';
-import { HANJA } from '../data/vocab.js';
-import { partsOf } from '../data/hanja-gloss.js';
+import { state, removeWord, wordsToReview, KNOWN_AFTER } from '../state.js';
+import { todayStr, makeRng } from '../rng.js';
 import { speakButton } from '../tts.js';
-import { addCards, ankiFile, giveAnkiFile, isMobile, prepareAnkiFile, hanjaCard, wordCard } from '../anki.js';
+import { addCards, ankiFile, giveAnkiFile, isMobile, prepareAnkiFile, wordCard } from '../anki.js';
 import { runQuiz } from '../quiz.js';
 import { currentSet, setStatus, restore, setSentToAnki, markSent, upcoming, wordsWith, wordInfo, STATUS } from '../vocab-plan.js';
-
-export function dayIndex() {
-  return Math.max(0, daysBetween(state.startDate, todayStr()));
-}
-
-function parseDate(s) {
-  const [y, m, d] = s.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-/** Hanja set index: starts at 0 on your first day, +1 every Sunday after that. */
-export function weekIndex() {
-  const days = dayIndex();
-  const startDow = parseDate(state.startDate).getDay();
-  let sundays = 0;
-  for (let k = 1; k <= days; k++) if ((startDow + k) % 7 === 0) sundays++;
-  return sundays;
-}
-
-export function hanjaForWeek(i) {
-  return Array.from({ length: 5 }, (_, k) => HANJA[(i * 5 + k) % HANJA.length]);
-}
-
-export const isSunday = () => new Date().getDay() === 0;
-
-const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-const meaningOf = (x) => x.en.split(';').map((m) => cap(m.trim())).join(', ');
-
-/** "Study + period = Semester", with this week's syllable in bold. */
-function breakdown(x, w) {
-  const parts = partsOf(w.ko, w.hj);
-  return h('span', { class: 'hanja-break' },
-    ...parts.flatMap((p, i) => [i ? ' + ' : '', p.ch === x.h ? h('b', {}, cap(p.gloss)) : cap(p.gloss)]),
-    ' = ', cap(w.en));
-}
-
-/** Sino-Korean syllables: the syllable, what it means, and sample words you can tap to save for review. */
-export function hanjaList(list) {
-  const wordBtn = (w) => {
-    const b = h('button', { type: 'button', class: 'hanja-word ko' });
-    const paint = () => {
-      const saved = !!state.myWords[w.ko];
-      b.replaceChildren(w.ko, h('span', { class: 'hanja-word-state' }, saved ? '✓ studying' : '+ study'));
-      b.classList.toggle('saved', saved);
-      b.title = saved ? 'In your saved words. Click to remove.' : 'Save to your words for review';
-    };
-    b.addEventListener('click', () => {
-      if (state.myWords[w.ko]) removeWord(w.ko);
-      else { saveWord(w.ko, w.en); toast(`Saved ${w.ko} to your words for review.`, 'good'); }
-      paint();
-    });
-    paint();
-    return b;
-  };
-  return h('div', { class: 'hanja-grid' }, ...list.map((x) => h('div', { class: 'hanja-card' },
-    h('div', { class: 'hanja-head' },
-      h('span', { class: 'hanja-syl ko' }, x.syl), speakButton(x.syl),
-      h('span', { class: 'hanja-mean' }, '– ', meaningOf(x))),
-    h('div', { class: 'muted small hanja-sub' }, 'Sample words (click to study)'),
-    h('ul', { class: 'hanja-words' }, ...x.words.map((w) => h('li', {},
-      h('div', { class: 'hanja-word-row' }, wordBtn(w), speakButton(w.ko)),
-      h('div', { class: 'small muted' }, breakdown(x, w))))))));
-}
 
 const dailyCard = (w) => wordCard(w, ['daily-word', `added-${todayStr()}`]);
 const ANKI_DOWN = 'Could not reach Anki. Is Anki open with AnkiConnect installed? See Settings → Anki. You can download the file instead.';
@@ -132,21 +67,6 @@ function downloadButton(deck, cards, name, onSent = () => {}) {
   const dl = h('button', { class: 'btn small', title: 'Download an Anki file (.apkg), then open it to import' }, 'Download for Anki');
   dl.addEventListener('click', async () => { if (await sendFile(deck, cards(), dl, name)) onSent(); });
   return dl;
-}
-
-/** Hanja: one set per week. */
-export function ankiButtons(indexes, label) {
-  if (isMobile) prepareAnkiFile();
-  const sent = indexes.every((i) => state.anki.hanja[i]);
-  const send = h('button', { class: 'btn primary small' }, sent ? '✓ In Anki' : `Add ${label} to Anki`);
-  const cards = () => indexes.flatMap((i) => hanjaForWeek(i).map((x) => hanjaCard(x, i)));
-  send.addEventListener('click', async () => {
-    if (!(await toAnki(state.settings.deckHanja, cards(), send, 'korean-hanja'))) return;
-    indexes.forEach((i) => (state.anki.hanja[i] = true));
-    save();
-    send.textContent = '✓ In Anki';
-  });
-  return h('div', { class: 'row-actions' }, send, downloadButton(state.settings.deckHanja, cards, 'korean-hanja'));
 }
 
 /**
@@ -269,8 +189,6 @@ function savedSection(main) {
 }
 
 export function renderWords(main) {
-  const wi = weekIndex();
-  const unsentWeeks = Array.from({ length: wi + 1 }, (_, i) => i).filter((i) => !state.anki.hanja[i]);
   const studyWords = [...currentSet(), ...wordsWith('studying')];
 
   const quizArea = h('div');
@@ -285,25 +203,11 @@ export function renderWords(main) {
     quizArea.scrollIntoView({ behavior: 'smooth' });
   }
 
-  const sendWeeks = h('button', { class: 'btn ghost small' }, 'Send all');
-  sendWeeks.addEventListener('click', async () => {
-    const cards = unsentWeeks.flatMap((i) => hanjaForWeek(i).map((x) => hanjaCard(x, i)));
-    if (!(await toAnki(state.settings.deckHanja, cards, sendWeeks, 'korean-hanja'))) return;
-    unsentWeeks.forEach((i) => (state.anki.hanja[i] = true));
-    save();
-    renderWords(main);
-  });
-
   main.replaceChildren(
-    h('header', { class: 'page-head' }, h('h1', {}, 'Words & Hanja'),
-      h('p', { class: 'muted' }, `5 new words each time you add a set to Anki, 5 new hanja every Sunday. You're studying ${wordsWith('studying').length} words.`)),
+    h('header', { class: 'page-head' }, h('h1', {}, 'Words'),
+      h('p', { class: 'muted' }, `5 new words each time you add a set to Anki. You're studying ${wordsWith('studying').length} words.`)),
     todaysWordsCard(() => renderWords(main)),
     savedSection(main),
-    h('section', { class: 'card' },
-      h('h2', {}, 'This week’s hanja ', isSunday() ? h('span', { class: 'badge' }, 'New today!') : ''),
-      hanjaList(hanjaForWeek(wi)),
-      ankiButtons([wi], "this week's hanja"),
-      unsentWeeks.length > 1 ? h('div', { class: 'small muted top-gap' }, `${unsentWeeks.length} weeks not sent to Anki yet. `, sendWeeks) : ''),
     h('section', { class: 'card' },
       h('h2', {}, 'Review your words'),
       h('p', { class: 'muted small' }, `${studyWords.length} words: your new set plus the ones you're studying.`),
